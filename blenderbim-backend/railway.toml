@@ -1,5 +1,5 @@
 [build]
-builder = "Dockerfile.txt"
-dockerfilePath = "blenderbim-backend/Dockerfile"
+dockerfilePath = "blenderbim-backend/Dockerfile.txt"
+
 
 
