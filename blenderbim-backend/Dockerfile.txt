@@ -1,36 +1,52 @@
-# Use official Python image
-FROM python:3.11-slim
+FROM ubuntu:22.04
 
-# Set working directory
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /app
 
-# 🛠️ Install system dependencies for IfcOpenShell
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    gcc \
-    g++ \
-    cmake \
-    git \
-    libspatialindex-dev \
-    libboost-all-dev \
+    wget \
+    bzip2 \
+    libfreetype6 \
+    libgl1-mesa-glx \
+    libglu1-mesa \
+    libxi6 \
+    libxrender1 \
+    libgomp1 \
+    python3.11 \
+    python3-pip \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Download and install Blender 4.0
+RUN wget -q https://download.blender.org/release/Blender4.0/blender-4.0.2-linux-x64.tar.xz && \
+    tar -xf blender-4.0.2-linux-x64.tar.xz && \
+    mv blender-4.0.2-linux-x64 /opt/blender && \
+    rm blender-4.0.2-linux-x64.tar.xz && \
+    ln -s /opt/blender/blender /usr/local/bin/blender
 
-# Copy project files
+# Install BlenderBIM addon
+RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240115/blenderbim-240115-py311-linux.zip && \
+    mkdir -p /root/.config/blender/4.0/scripts/addons && \
+    unzip -q blenderbim-240115-py311-linux.zip -d /root/.config/blender/4.0/scripts/addons/ && \
+    rm blenderbim-240115-py311-linux.zip
+
+# Enable BlenderBIM addon
+RUN blender --background --python-expr "import bpy; bpy.ops.preferences.addon_enable(module='blenderbim'); bpy.ops.wm.save_userpref()"
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Copy application files
 COPY main.py .
+COPY blender_generator.py .
 COPY start.sh .
 
-# Ensure start.sh is executable
 RUN chmod +x start.sh
 
-# Expose port for FastAPI or Flask
 EXPOSE ${PORT}
 
-
-# 🚀 Start the app
-# Note: start.sh must reference the $PORT variable if needed.
 CMD ["./start.sh"]
-
