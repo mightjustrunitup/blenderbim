@@ -35,12 +35,13 @@ RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blend
     mkdir -p /root/.config/blender/4.0/scripts/addons && \
     unzip -q blenderbim-240115-py311-linux.zip -d /root/.config/blender/4.0/scripts/addons/ && \
     rm blenderbim-240115-py311-linux.zip && \
-    rm -rf /root/.config/blender/4.0/scripts/addons/blenderbim/libs/site/packages/shapely
+    rm -rf /root/.config/blender/4.0/scripts/addons/blenderbim/libs/site/packages/shapely && \
+    rm -rf /root/.config/blender/4.0/scripts/addons/blenderbim/libs/site/packages/lxml
 
-# Install shapely into Blender's Python environment (required by BlenderBIM)
+# Install required dependencies into Blender's Python environment (required by BlenderBIM)
 RUN /opt/blender/4.0/python/bin/python3.10 -m ensurepip && \
     /opt/blender/4.0/python/bin/python3.10 -m pip install --upgrade pip && \
-    /opt/blender/4.0/python/bin/python3.10 -m pip install shapely==2.0.2
+    /opt/blender/4.0/python/bin/python3.10 -m pip install shapely==2.0.2 lxml==5.1.0
 
 # Enable BlenderBIM addon
 RUN blender --background --python-expr "import bpy; bpy.ops.preferences.addon_enable(module='blenderbim'); bpy.ops.wm.save_userpref()"
