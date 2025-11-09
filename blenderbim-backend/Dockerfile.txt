@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     libxkbcommon0 \
     libgomp1 \
+    libgeos-dev \
     python3.11 \
     python3-pip \
     xvfb \
