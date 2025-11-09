@@ -8,9 +8,16 @@ import json
 import argparse
 from pathlib import Path
 
-# Add BlenderBIM to path
+print("Starting BlenderBIM IFC Generator")
+print(f"Blender version: {bpy.app.version_string}")
+
+# Enable BlenderBIM addon
 import addon_utils
-addon_utils.enable("blenderbim")
+addon_result = addon_utils.enable("blenderbim")
+if not addon_result:
+    print("ERROR: Failed to enable BlenderBIM addon")
+    sys.exit(1)
+print("BlenderBIM addon enabled successfully")
 
 import blenderbim.tool as tool
 from blenderbim.bim.ifc import IfcStore
@@ -139,13 +146,28 @@ def create_beam(params: dict):
     y = params.get('y', 0) / 1000.0
     z = params.get('z', 3000) / 1000.0
     
-    # Create beam
+    print(f"Creating beam: L={length}m, W={width}m, H={height}m at ({x}, {y}, {z})")
+    
+    # Create beam geometry
     bpy.ops.mesh.primitive_cube_add(size=1, location=(x + length/2, y, z))
     beam_obj = bpy.context.active_object
     beam_obj.scale = (length, width, height)
+    beam_obj.name = params.get('name', 'Beam')
+    
+    print(f"Beam geometry created: {beam_obj.name}")
+    
+    # Ensure object is selected and active
+    bpy.ops.object.select_all(action='DESELECT')
+    beam_obj.select_set(True)
+    bpy.context.view_layer.objects.active = beam_obj
     
     # Assign IFC class
-    bpy.ops.bim.assign_class(ifc_class="IfcBeam", predefined_type="BEAM", userdefined_type="")
+    try:
+        bpy.ops.bim.assign_class(ifc_class="IfcBeam", predefined_type="BEAM", userdefined_type="")
+        print(f"IFC class assigned to {beam_obj.name}")
+    except Exception as e:
+        print(f"ERROR assigning IFC class: {e}")
+        raise
     
     return beam_obj
 
@@ -254,11 +276,35 @@ def main():
         else:
             print(f"Warning: Unknown function {function}")
     
+    # Verify IFC file exists
+    ifc_file = IfcStore.get_file()
+    if not ifc_file:
+        print("ERROR: No IFC file in store")
+        sys.exit(1)
+    
+    elements = ifc_file.by_type("IfcProduct")
+    print(f"Total IFC elements created: {len(elements)}")
+    
+    if len(elements) == 0:
+        print("WARNING: No IFC elements created")
+    
     # Save IFC file
     print(f"Saving IFC to: {args.output}")
-    bpy.ops.export_ifc.bim(filepath=args.output)
+    try:
+        bpy.ops.export_ifc.bim(filepath=args.output)
+        print(f"IFC export completed")
+    except Exception as e:
+        print(f"ERROR during IFC export: {e}")
+        raise
     
-    print("IFC generation complete!")
+    # Verify output file exists
+    from pathlib import Path
+    if not Path(args.output).exists():
+        print(f"ERROR: Output file not created at {args.output}")
+        sys.exit(1)
+    
+    file_size = Path(args.output).stat().st_size
+    print(f"IFC generation complete! File size: {file_size} bytes")
 
 if __name__ == "__main__":
     main()
