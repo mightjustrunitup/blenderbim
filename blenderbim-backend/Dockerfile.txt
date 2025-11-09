@@ -34,7 +34,6 @@ RUN wget -q https://download.blender.org/release/Blender4.0/blender-4.0.2-linux-
 RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240115/blenderbim-240115-py311-linux.zip && \
     mkdir -p /root/.config/blender/4.0/scripts/addons && \
     unzip -q blenderbim-240115-py311-linux.zip -d /root/.config/blender/4.0/scripts/addons/ && \
-    rm blenderbim-240115-py311-linux.zip
     rm blenderbim-240115-py311-linux.zip && \
     rm -rf /root/.config/blender/4.0/scripts/addons/blenderbim/libs/site/packages/shapely
 
