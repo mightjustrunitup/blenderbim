@@ -35,6 +35,8 @@ RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blend
     mkdir -p /root/.config/blender/4.0/scripts/addons && \
     unzip -q blenderbim-240115-py311-linux.zip -d /root/.config/blender/4.0/scripts/addons/ && \
     rm blenderbim-240115-py311-linux.zip
+    rm blenderbim-240115-py311-linux.zip && \
+    rm -rf /root/.config/blender/4.0/scripts/addons/blenderbim/libs/site/packages/shapely
 
 # Install shapely into Blender's Python environment (required by BlenderBIM)
 RUN /opt/blender/4.0/python/bin/python3.10 -m ensurepip && \
