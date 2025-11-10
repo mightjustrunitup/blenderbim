@@ -44,9 +44,19 @@ def create_project(project_name: str):
 
 def create_wall(params: dict):
     """Create a wall using BlenderBIM"""
-    length = params.get('length', 5000) / 1000.0  # Convert to meters
-    height = params.get('height', 3000) / 1000.0
-    thickness = params.get('thickness', 200) / 1000.0
+    # Auto-scale if values are already in meters (< 10 suggests meters, not mm)
+    length = params.get('length', 5000)
+    height = params.get('height', 3000)
+    thickness = params.get('thickness', 200)
+    if length < 10 or height < 10 or thickness < 1:
+        print(f"⚠️ Auto-scaling wall (detected meter values instead of mm)")
+        length *= 1000
+        height *= 1000
+        thickness *= 1000
+    
+    length = length / 1000.0  # Convert to meters
+    height = height / 1000.0
+    thickness = thickness / 1000.0
     x = params.get('x', 0) / 1000.0
     y = params.get('y', 0) / 1000.0
     z = params.get('z', 0) / 1000.0
@@ -63,9 +73,18 @@ def create_wall(params: dict):
 
 def create_slab(params: dict):
     """Create a slab/floor using BlenderBIM"""
-    length = params.get('length', 5000) / 1000.0
-    width = params.get('width', 5000) / 1000.0
-    thickness = params.get('thickness', 200) / 1000.0
+    length = params.get('length', 5000)
+    width = params.get('width', 5000)
+    thickness = params.get('thickness', 200)
+    if length < 10 or width < 10 or thickness < 1:
+        print(f"⚠️ Auto-scaling slab (detected meter values)")
+        length *= 1000
+        width *= 1000
+        thickness *= 1000
+    
+    length = length / 1000.0
+    width = width / 1000.0
+    thickness = thickness / 1000.0
     x = params.get('x', 0) / 1000.0
     y = params.get('y', 0) / 1000.0
     z = params.get('z', 0) / 1000.0
@@ -82,9 +101,18 @@ def create_slab(params: dict):
 
 def create_door(params: dict):
     """Create a door using BlenderBIM"""
-    width = params.get('width', 900) / 1000.0
-    height = params.get('height', 2100) / 1000.0
-    thickness = params.get('thickness', 50) / 1000.0
+    width = params.get('width', 900)
+    height = params.get('height', 2100)
+    thickness = params.get('thickness', 50)
+    if width < 10 or height < 10:
+        print(f"⚠️ Auto-scaling door (detected meter values)")
+        width *= 1000
+        height *= 1000
+        thickness *= 1000
+    
+    width = width / 1000.0
+    height = height / 1000.0
+    thickness = thickness / 1000.0
     x = params.get('x', 0) / 1000.0
     y = params.get('y', 0) / 1000.0
     z = params.get('z', 0) / 1000.0
@@ -101,9 +129,18 @@ def create_door(params: dict):
 
 def create_window(params: dict):
     """Create a window using BlenderBIM"""
-    width = params.get('width', 1200) / 1000.0
-    height = params.get('height', 1200) / 1000.0
-    thickness = params.get('thickness', 100) / 1000.0
+    width = params.get('width', 1200)
+    height = params.get('height', 1200)
+    thickness = params.get('thickness', 100)
+    if width < 10 or height < 10:
+        print(f"⚠️ Auto-scaling window (detected meter values)")
+        width *= 1000
+        height *= 1000
+        thickness *= 1000
+    
+    width = width / 1000.0
+    height = height / 1000.0
+    thickness = thickness / 1000.0
     x = params.get('x', 0) / 1000.0
     y = params.get('y', 0) / 1000.0
     z = params.get('z', 1000) / 1000.0
@@ -120,9 +157,18 @@ def create_window(params: dict):
 
 def create_column(params: dict):
     """Create a column using BlenderBIM"""
-    width = params.get('width', 300) / 1000.0
-    depth = params.get('depth', 300) / 1000.0
-    height = params.get('height', 3000) / 1000.0
+    width = params.get('width', 300)
+    depth = params.get('depth', 300)
+    height = params.get('height', 3000)
+    if width < 10 or depth < 10 or height < 10:
+        print(f"⚠️ Auto-scaling column (detected meter values)")
+        width *= 1000
+        depth *= 1000
+        height *= 1000
+    
+    width = width / 1000.0
+    depth = depth / 1000.0
+    height = height / 1000.0
     x = params.get('x', 0) / 1000.0
     y = params.get('y', 0) / 1000.0
     z = params.get('z', 0) / 1000.0
@@ -139,9 +185,18 @@ def create_column(params: dict):
 
 def create_beam(params: dict):
     """Create a beam using BlenderBIM"""
-    length = params.get('length', 5000) / 1000.0
-    width = params.get('width', 300) / 1000.0
-    height = params.get('height', 400) / 1000.0
+    length = params.get('length', 5000)
+    width = params.get('width', 300)
+    height = params.get('height', 400)
+    if length < 10 or width < 10 or height < 10:
+        print(f"⚠️ Auto-scaling beam (detected meter values)")
+        length *= 1000
+        width *= 1000
+        height *= 1000
+    
+    length = length / 1000.0
+    width = width / 1000.0
+    height = height / 1000.0
     x = params.get('x', 0) / 1000.0
     y = params.get('y', 0) / 1000.0
     z = params.get('z', 3000) / 1000.0
@@ -173,9 +228,18 @@ def create_beam(params: dict):
 
 def create_roof(params: dict):
     """Create a roof using BlenderBIM"""
-    length = params.get('length', 10000) / 1000.0
-    width = params.get('width', 10000) / 1000.0
-    thickness = params.get('thickness', 200) / 1000.0
+    length = params.get('length', 10000)
+    width = params.get('width', 10000)
+    thickness = params.get('thickness', 200)
+    if length < 10 or width < 10 or thickness < 1:
+        print(f"⚠️ Auto-scaling roof (detected meter values)")
+        length *= 1000
+        width *= 1000
+        thickness *= 1000
+    
+    length = length / 1000.0
+    width = width / 1000.0
+    thickness = thickness / 1000.0
     x = params.get('x', 0) / 1000.0
     y = params.get('y', 0) / 1000.0
     z = params.get('z', 6000) / 1000.0
@@ -192,9 +256,18 @@ def create_roof(params: dict):
 
 def create_stairs(params: dict):
     """Create stairs using BlenderBIM"""
-    width = params.get('width', 1200) / 1000.0
-    length = params.get('length', 3000) / 1000.0
-    height = params.get('height', 3000) / 1000.0
+    width = params.get('width', 1200)
+    length = params.get('length', 3000)
+    height = params.get('height', 3000)
+    if width < 10 or length < 10 or height < 10:
+        print(f"⚠️ Auto-scaling stairs (detected meter values)")
+        width *= 1000
+        length *= 1000
+        height *= 1000
+    
+    width = width / 1000.0
+    length = length / 1000.0
+    height = height / 1000.0
     steps = params.get('steps', 15)
     x = params.get('x', 0) / 1000.0
     y = params.get('y', 0) / 1000.0
