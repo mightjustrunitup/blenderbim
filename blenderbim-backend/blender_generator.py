@@ -197,19 +197,607 @@ def create_roof(params: dict):
     
     return roof_obj
 
-def create_stairs(params: dict):
-    """Create stairs using BlenderBIM"""
-    # Values are in meters from the edge function
-    width = params.get('width', 1.2)
-    length = params.get('length', 3.0)
-    height = params.get('height', 3.0)
-    steps = params.get('steps', 15)
+def create_box(params: dict):
+    """Create a box/cube using BlenderBIM"""
+    width = params.get('width', 1.0)
+    height = params.get('height', 1.0)
+    depth = params.get('depth', 1.0)
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
     
-    step_height = height / steps
-    step_depth = length / steps
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + depth/2, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, depth, height)
+    obj.name = params.get('name', 'Box')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcBuildingElementProxy", predefined_type="ELEMENT", userdefined_type="")
+    return obj
+
+def create_cylinder(params: dict):
+    """Create a cylinder using BlenderBIM"""
+    radius = params.get('radius', 0.5)
+    height = params.get('height', 2.0)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cylinder_add(radius=radius, depth=height, location=(x, y, z + height/2))
+    obj = bpy.context.active_object
+    obj.name = params.get('name', 'Cylinder')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcColumn", predefined_type="COLUMN", userdefined_type="")
+    return obj
+
+def create_sphere(params: dict):
+    """Create a sphere using BlenderBIM"""
+    radius = params.get('radius', 0.5)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, location=(x, y, z))
+    obj = bpy.context.active_object
+    obj.name = params.get('name', 'Sphere')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcBuildingElementProxy", predefined_type="ELEMENT", userdefined_type="")
+    return obj
+
+def create_cone(params: dict):
+    """Create a cone using BlenderBIM"""
+    radius = params.get('radius', 0.5)
+    height = params.get('height', 2.0)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cone_add(radius1=radius, depth=height, location=(x, y, z + height/2))
+    obj = bpy.context.active_object
+    obj.name = params.get('name', 'Cone')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcBuildingElementProxy", predefined_type="ELEMENT", userdefined_type="")
+    return obj
+
+def create_torus(params: dict):
+    """Create a torus using BlenderBIM"""
+    radius = params.get('radius', 1.0)
+    tube = params.get('tube', 0.25)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_torus_add(major_radius=radius, minor_radius=tube, location=(x, y, z))
+    obj = bpy.context.active_object
+    obj.name = params.get('name', 'Torus')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcBuildingElementProxy", predefined_type="ELEMENT", userdefined_type="")
+    return obj
+
+def create_plane(params: dict):
+    """Create a plane using BlenderBIM"""
+    width = params.get('width', 2.0)
+    height = params.get('height', 2.0)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(x + width/2, y + height/2, z))
+    obj = bpy.context.active_object
+    obj.scale = (width, height, 1)
+    obj.name = params.get('name', 'Plane')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcSlab", predefined_type="FLOOR", userdefined_type="")
+    return obj
+
+# ===== STRUCTURAL FOUNDATIONS =====
+def create_footing(params: dict):
+    """Create a foundation footing"""
+    width = params.get('width', 2.0)
+    depth = params.get('depth', 2.0)
+    thickness = params.get('thickness', 0.5)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', -0.5)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + depth/2, z + thickness/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, depth, thickness)
+    obj.name = params.get('name', 'Footing')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcFooting", predefined_type="PAD_FOOTING", userdefined_type="")
+    return obj
+
+def create_pile(params: dict):
+    """Create a deep foundation pile"""
+    diameter = params.get('diameter', 0.6)
+    length = params.get('length', 10.0)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cylinder_add(radius=diameter/2, depth=length, location=(x, y, z - length/2))
+    obj = bpy.context.active_object
+    obj.name = params.get('name', 'Pile')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcPile", predefined_type="DRIVEN", userdefined_type="")
+    return obj
+
+def create_pile_cap(params: dict):
+    """Create a pile cap"""
+    width = params.get('width', 2.0)
+    depth = params.get('depth', 2.0)
+    thickness = params.get('thickness', 0.8)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', -0.3)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + depth/2, z + thickness/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, depth, thickness)
+    obj.name = params.get('name', 'PileCap')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcFooting", predefined_type="PILE_CAP", userdefined_type="")
+    return obj
+
+# ===== STRUCTURAL FRAMING =====
+def create_truss(params: dict):
+    """Create a structural truss"""
+    length = params.get('length', 10.0)
+    height = params.get('height', 2.0)
+    width = params.get('width', 0.2)
+    x = params.get('x', 0.0)
+    y = params.get('y', 3.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + length/2, y, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (length, width, height)
+    obj.name = params.get('name', 'Truss')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcMember", predefined_type="TRUSS", userdefined_type="")
+    return obj
+
+def create_brace(params: dict):
+    """Create a diagonal structural brace"""
+    length = params.get('length', 3.0)
+    width = params.get('width', 0.2)
+    height = params.get('height', 0.2)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    angle = params.get('angle', 45)
+    
+    import math
+    angle_rad = math.radians(angle)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + length/2, y, z + length/2 * math.sin(angle_rad)))
+    obj = bpy.context.active_object
+    obj.scale = (length, width, height)
+    obj.rotation_euler[1] = angle_rad
+    obj.name = params.get('name', 'Brace')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcMember", predefined_type="BRACE", userdefined_type="")
+    return obj
+
+def create_plate(params: dict):
+    """Create a structural steel plate"""
+    width = params.get('width', 0.5)
+    height = params.get('height', 0.5)
+    thickness = params.get('thickness', 0.02)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + thickness/2, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, thickness, height)
+    obj.name = params.get('name', 'Plate')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcPlate", predefined_type="BASE_PLATE", userdefined_type="")
+    return obj
+
+def create_reinforcing_bar(params: dict):
+    """Create reinforcing steel bar (rebar)"""
+    diameter = params.get('diameter', 0.016)
+    length = params.get('length', 5.0)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cylinder_add(radius=diameter/2, depth=length, location=(x + length/2, y, z))
+    obj = bpy.context.active_object
+    obj.rotation_euler[1] = 1.5708  # 90 degrees to make it horizontal
+    obj.name = params.get('name', 'Rebar')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcReinforcingBar", predefined_type="SPACEBAR", userdefined_type="")
+    return obj
+
+# ===== ARCHITECTURAL ELEMENTS =====
+def create_ramp(params: dict):
+    """Create an accessible ramp"""
+    width = params.get('width', 1.5)
+    length = params.get('length', 10.0)
+    height = params.get('height', 1.0)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    import math
+    
+    # Create ramp as an angled slab
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + length/2, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, length, 0.2)
+    obj.rotation_euler[0] = math.atan(height / length)
+    obj.name = params.get('name', 'Ramp')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcRamp", predefined_type="STRAIGHT_RUN_RAMP", userdefined_type="")
+    return obj
+
+def create_railing(params: dict):
+    """Create a safety railing"""
+    length = params.get('length', 5.0)
+    height = params.get('height', 1.1)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    # Create top rail
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + length/2, y, z + height))
+    obj = bpy.context.active_object
+    obj.scale = (length, 0.05, 0.05)
+    obj.name = params.get('name', 'Railing')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcRailing", predefined_type="HANDRAIL", userdefined_type="")
+    return obj
+
+def create_curtain_wall(params: dict):
+    """Create a glass curtain wall facade"""
+    width = params.get('width', 10.0)
+    height = params.get('height', 3.0)
+    thickness = params.get('thickness', 0.1)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, thickness, height)
+    obj.name = params.get('name', 'CurtainWall')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcCurtainWall", predefined_type="USERDEFINED", userdefined_type="")
+    return obj
+
+def create_ceiling(params: dict):
+    """Create a ceiling"""
+    width = params.get('width', 5.0)
+    depth = params.get('depth', 5.0)
+    thickness = params.get('thickness', 0.05)
+    x = params.get('x', 0.0)
+    y = params.get('y', 2.7)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y, z + depth/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, thickness, depth)
+    obj.name = params.get('name', 'Ceiling')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcCovering", predefined_type="CEILING", userdefined_type="")
+    return obj
+
+def create_covering(params: dict):
+    """Create floor, wall, or ceiling covering"""
+    width = params.get('width', 5.0)
+    depth = params.get('depth', 5.0)
+    thickness = params.get('thickness', 0.01)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + thickness/2, z + depth/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, thickness, depth)
+    obj.name = params.get('name', 'Covering')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcCovering", predefined_type="FLOORING", userdefined_type="")
+    return obj
+
+# ===== MEP SYSTEMS =====
+def create_duct(params: dict):
+    """Create HVAC ductwork"""
+    width = params.get('width', 0.4)
+    height = params.get('height', 0.3)
+    length = params.get('length', 5.0)
+    x = params.get('x', 0.0)
+    y = params.get('y', 2.5)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + length/2, y, z + width/2))
+    obj = bpy.context.active_object
+    obj.scale = (length, height, width)
+    obj.name = params.get('name', 'Duct')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcDuctSegment", predefined_type="RIGIDSEGMENT", userdefined_type="")
+    return obj
+
+def create_pipe(params: dict):
+    """Create piping"""
+    diameter = params.get('diameter', 0.05)
+    length = params.get('length', 5.0)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cylinder_add(radius=diameter/2, depth=length, location=(x + length/2, y, z))
+    obj = bpy.context.active_object
+    obj.rotation_euler[1] = 1.5708  # Horizontal
+    obj.name = params.get('name', 'Pipe')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcPipeSegment", predefined_type="RIGIDSEGMENT", userdefined_type="")
+    return obj
+
+def create_cable_carrier(params: dict):
+    """Create cable tray or conduit"""
+    width = params.get('width', 0.3)
+    height = params.get('height', 0.1)
+    length = params.get('length', 5.0)
+    x = params.get('x', 0.0)
+    y = params.get('y', 2.8)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + length/2, y, z + width/2))
+    obj = bpy.context.active_object
+    obj.scale = (length, height, width)
+    obj.name = params.get('name', 'CableTray')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcCableCarrierSegment", predefined_type="CABLETRAY", userdefined_type="")
+    return obj
+
+def create_hvac_equipment(params: dict):
+    """Create HVAC equipment"""
+    width = params.get('width', 1.0)
+    height = params.get('height', 1.0)
+    depth = params.get('depth', 0.5)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + depth/2, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, depth, height)
+    obj.name = params.get('name', 'HVAC_Equipment')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcUnitaryEquipment", predefined_type="AIRCONDITIONINGUNIT", userdefined_type="")
+    return obj
+
+def create_pump(params: dict):
+    """Create a mechanical pump"""
+    diameter = params.get('diameter', 0.5)
+    height = params.get('height', 0.8)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cylinder_add(radius=diameter/2, depth=height, location=(x, y, z + height/2))
+    obj = bpy.context.active_object
+    obj.name = params.get('name', 'Pump')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcPump", predefined_type="CIRCULATOR", userdefined_type="")
+    return obj
+
+def create_valve(params: dict):
+    """Create a valve"""
+    diameter = params.get('diameter', 0.1)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=diameter/2, location=(x, y, z))
+    obj = bpy.context.active_object
+    obj.name = params.get('name', 'Valve')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcValve", predefined_type="ISOLATING", userdefined_type="")
+    return obj
+
+def create_sensor(params: dict):
+    """Create a sensor"""
+    size = params.get('size', 0.1)
+    x = params.get('x', 0.0)
+    y = params.get('y', 2.5)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=size/2, location=(x, y, z))
+    obj = bpy.context.active_object
+    obj.name = params.get('name', 'Sensor')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcSensor", predefined_type="FIRESENSOR", userdefined_type="")
+    return obj
+
+def create_light_fixture(params: dict):
+    """Create a lighting fixture"""
+    width = params.get('width', 0.6)
+    depth = params.get('depth', 0.15)
+    height = params.get('height', 0.1)
+    x = params.get('x', 0.0)
+    y = params.get('y', 2.7)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y, z + depth/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, height, depth)
+    obj.name = params.get('name', 'LightFixture')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcLightFixture", predefined_type="POINTSOURCE", userdefined_type="")
+    return obj
+
+def create_electrical_outlet(params: dict):
+    """Create an electrical outlet"""
+    width = params.get('width', 0.08)
+    height = params.get('height', 0.12)
+    depth = params.get('depth', 0.04)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.3)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x, y + depth/2, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, depth, height)
+    obj.name = params.get('name', 'Outlet')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcOutlet", predefined_type="POWEROUTLET", userdefined_type="")
+    return obj
+
+def create_switch(params: dict):
+    """Create an electrical light switch"""
+    width = params.get('width', 0.08)
+    height = params.get('height', 0.12)
+    depth = params.get('depth', 0.03)
+    x = params.get('x', 0.0)
+    y = params.get('y', 1.2)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x, y + depth/2, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, depth, height)
+    obj.name = params.get('name', 'Switch')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcSwitchingDevice", predefined_type="TOGGLESWITCH", userdefined_type="")
+    return obj
+
+# ===== FURNISHING =====
+def create_furniture(params: dict):
+    """Create furniture items"""
+    width = params.get('width', 1.0)
+    height = params.get('height', 0.75)
+    depth = params.get('depth', 0.6)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + depth/2, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, depth, height)
+    obj.name = params.get('name', 'Furniture')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcFurniture", predefined_type="USERDEFINED", userdefined_type="")
+    return obj
+
+def create_cabinet(params: dict):
+    """Create a cabinet or storage unit"""
+    width = params.get('width', 1.0)
+    height = params.get('height', 2.0)
+    depth = params.get('depth', 0.6)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + depth/2, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, depth, height)
+    obj.name = params.get('name', 'Cabinet')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcFurniture", predefined_type="USERDEFINED", userdefined_type="")
+    return obj
+
+def create_countertop(params: dict):
+    """Create a countertop or worktop surface"""
+    width = params.get('width', 2.0)
+    depth = params.get('depth', 0.6)
+    thickness = params.get('thickness', 0.04)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.9)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y, z + depth/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, thickness, depth)
+    obj.name = params.get('name', 'Countertop')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcSlab", predefined_type="FLOOR", userdefined_type="")
+    return obj
+
+# ===== SITE ELEMENTS =====
+def create_pavement(params: dict):
+    """Create pavement or road surface"""
+    width = params.get('width', 3.0)
+    length = params.get('length', 10.0)
+    thickness = params.get('thickness', 0.2)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', -0.2)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + thickness/2, z + length/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, thickness, length)
+    obj.name = params.get('name', 'Pavement')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcPavement", predefined_type="USERDEFINED", userdefined_type="")
+    return obj
+
+def create_kerb(params: dict):
+    """Create a kerb (curb) along pavement edge"""
+    length = params.get('length', 10.0)
+    width = params.get('width', 0.15)
+    height = params.get('height', 0.15)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + length/2, y + width/2, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (length, width, height)
+    obj.name = params.get('name', 'Kerb')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcKerb", predefined_type="USERDEFINED", userdefined_type="")
+    return obj
+
+def create_parking_space(params: dict):
+    """Create a parking space marking"""
+    width = params.get('width', 2.5)
+    length = params.get('length', 5.0)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    # Create a thin marking
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(x + width/2, y + length/2, z + 0.01))
+    obj = bpy.context.active_object
+    obj.scale = (width, length, 1)
+    obj.name = params.get('name', 'ParkingSpace')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcBuildingElementProxy", predefined_type="ELEMENT", userdefined_type="")
+    return obj
+
+def create_signage(params: dict):
+    """Create signage or wayfinding signs"""
+    width = params.get('width', 0.6)
+    height = params.get('height', 0.4)
+    thickness = params.get('thickness', 0.05)
+    x = params.get('x', 0.0)
+    y = params.get('y', 1.8)
+    z = params.get('z', 0.0)
+    
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + thickness/2, z + height/2))
+    obj = bpy.context.active_object
+    obj.scale = (width, thickness, height)
+    obj.name = params.get('name', 'Signage')
+    
+    bpy.ops.bim.assign_class(ifc_class="IfcSign", predefined_type="USERDEFINED", userdefined_type="")
+    return obj
+
+def create_stairs(params: dict):
+    """Create stairs using BlenderBIM"""
+    # Values are in meters from the edge function
+    width = params.get('width', 1.2)
+    steps = params.get('steps', 15)
+    step_height = params.get('stepHeight', 0.18)
+    step_depth = params.get('stepDepth', 0.28)
+    x = params.get('x', 0.0)
+    y = params.get('y', 0.0)
+    z = params.get('z', 0.0)
+    
+    total_height = step_height * steps
+    total_length = step_depth * steps
     
     # Create stairs as a series of steps
     for i in range(steps):
@@ -231,6 +819,15 @@ def create_stairs(params: dict):
 
 # Handler mapping
 ELEMENT_HANDLERS = {
+    # Basic shapes
+    'create_box': create_box,
+    'create_cylinder': create_cylinder,
+    'create_sphere': create_sphere,
+    'create_cone': create_cone,
+    'create_torus': create_torus,
+    'create_plane': create_plane,
+    
+    # Basic BIM elements
     'create_wall': create_wall,
     'create_slab': create_slab,
     'create_door': create_door,
@@ -239,6 +836,47 @@ ELEMENT_HANDLERS = {
     'create_beam': create_beam,
     'create_roof': create_roof,
     'create_stairs': create_stairs,
+    
+    # Structural foundations
+    'create_footing': create_footing,
+    'create_pile': create_pile,
+    'create_pile_cap': create_pile_cap,
+    
+    # Structural framing
+    'create_truss': create_truss,
+    'create_brace': create_brace,
+    'create_plate': create_plate,
+    'create_reinforcing_bar': create_reinforcing_bar,
+    
+    # Architectural elements
+    'create_ramp': create_ramp,
+    'create_railing': create_railing,
+    'create_curtain_wall': create_curtain_wall,
+    'create_ceiling': create_ceiling,
+    'create_covering': create_covering,
+    
+    # MEP systems
+    'create_duct': create_duct,
+    'create_pipe': create_pipe,
+    'create_cable_carrier': create_cable_carrier,
+    'create_hvac_equipment': create_hvac_equipment,
+    'create_pump': create_pump,
+    'create_valve': create_valve,
+    'create_sensor': create_sensor,
+    'create_light_fixture': create_light_fixture,
+    'create_electrical_outlet': create_electrical_outlet,
+    'create_switch': create_switch,
+    
+    # Furnishing
+    'create_furniture': create_furniture,
+    'create_cabinet': create_cabinet,
+    'create_countertop': create_countertop,
+    
+    # Site elements
+    'create_pavement': create_pavement,
+    'create_kerb': create_kerb,
+    'create_parking_space': create_parking_space,
+    'create_signage': create_signage,
 }
 
 def main():
