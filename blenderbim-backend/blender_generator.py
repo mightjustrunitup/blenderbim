@@ -22,6 +22,79 @@ print("BlenderBIM addon enabled successfully")
 import blenderbim.tool as tool
 from blenderbim.bim.ifc import IfcStore
 
+def hex_to_rgb(hex_color: str) -> tuple:
+    """Convert hex color to RGB tuple (0-1 range)"""
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+
+def apply_material(obj, color: str = None, material_name: str = None):
+    """Apply a material with color to a Blender object and set IFC style"""
+    if color is None:
+        color = "#808080"  # Default gray
+    
+    # Create or get material
+    mat_name = material_name or f"Material_{color}"
+    mat = bpy.data.materials.get(mat_name)
+    
+    if mat is None:
+        mat = bpy.data.materials.new(name=mat_name)
+        mat.use_nodes = True
+        mat.diffuse_color = (*hex_to_rgb(color), 1.0)
+        
+        # Set up material nodes for better rendering
+        if mat.node_tree:
+            nodes = mat.node_tree.nodes
+            nodes.clear()
+            
+            # Create Principled BSDF
+            bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+            bsdf.location = (0, 0)
+            bsdf.inputs['Base Color'].default_value = (*hex_to_rgb(color), 1.0)
+            bsdf.inputs['Metallic'].default_value = 0.1
+            bsdf.inputs['Roughness'].default_value = 0.5
+            
+            # Create Material Output
+            output = nodes.new(type='ShaderNodeOutputMaterial')
+            output.location = (300, 0)
+            
+            # Link nodes
+            mat.node_tree.links.new(bsdf.outputs['BSDF'], output.inputs['Surface'])
+    
+    # Assign material to object
+    if obj.data.materials:
+        obj.data.materials[0] = mat
+    else:
+        obj.data.materials.append(mat)
+    
+    # Set IFC style representation
+    try:
+        ifc_file = IfcStore.get_file()
+        if ifc_file:
+            element = ifc_file.by_id(obj.BIMObjectProperties.ifc_definition_id)
+            if element:
+                # Create IFC surface style
+                rgb = hex_to_rgb(color)
+                style = ifc_file.createIfcSurfaceStyleRendering(
+                    ifc_file.createIfcColourRgb(None, rgb[0], rgb[1], rgb[2]),
+                    None, None, None, None, None, None, "FLAT"
+                )
+                surface_style = ifc_file.createIfcSurfaceStyle(
+                    mat_name, "BOTH", [style]
+                )
+                
+                # Apply to object representations
+                if hasattr(element, 'Representation') and element.Representation:
+                    for rep in element.Representation.Representations:
+                        for item in rep.Items:
+                            if not hasattr(item, 'StyledByItem') or not item.StyledByItem:
+                                style_assignment = ifc_file.createIfcStyledItem(
+                                    item, [ifc_file.createIfcPresentationStyleAssignment([surface_style])], None
+                                )
+    except Exception as e:
+        print(f"Warning: Could not apply IFC style: {e}")
+    
+    return mat
+
 def create_project(project_name: str):
     """Initialize a new IFC project with proper structure"""
     # Clear existing scene
@@ -51,14 +124,19 @@ def create_wall(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#e8e8e8')
     
     # Create wall
     bpy.ops.mesh.primitive_cube_add(size=1, location=(x + length/2, y, z + height/2))
     wall_obj = bpy.context.active_object
     wall_obj.scale = (length, thickness, height)
+    wall_obj.name = params.get('name', 'Wall')
     
     # Assign IFC class
     bpy.ops.bim.assign_class(ifc_class="IfcWall", predefined_type="SOLIDWALL", userdefined_type="")
+    
+    # Apply material
+    apply_material(wall_obj, color, f"Wall_{color}")
     
     return wall_obj
 
@@ -71,14 +149,19 @@ def create_slab(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#d0d0d0')
     
     # Create slab
     bpy.ops.mesh.primitive_cube_add(size=1, location=(x + length/2, y + width/2, z + thickness/2))
     slab_obj = bpy.context.active_object
     slab_obj.scale = (length, width, thickness)
+    slab_obj.name = params.get('name', 'Slab')
     
     # Assign IFC class
     bpy.ops.bim.assign_class(ifc_class="IfcSlab", predefined_type="FLOOR", userdefined_type="")
+    
+    # Apply material
+    apply_material(slab_obj, color, f"Concrete_{color}")
     
     return slab_obj
 
@@ -91,14 +174,19 @@ def create_door(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#8b4513')
     
     # Create door panel
     bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y, z + height/2))
     door_obj = bpy.context.active_object
     door_obj.scale = (width, thickness, height)
+    door_obj.name = params.get('name', 'Door')
     
     # Assign IFC class
     bpy.ops.bim.assign_class(ifc_class="IfcDoor", predefined_type="DOOR", userdefined_type="")
+    
+    # Apply material
+    apply_material(door_obj, color, f"Wood_{color}")
     
     return door_obj
 
@@ -111,14 +199,19 @@ def create_window(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 1.0)
+    color = params.get('color', '#87ceeb')
     
     # Create window frame
     bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y, z + height/2))
     window_obj = bpy.context.active_object
     window_obj.scale = (width, thickness, height)
+    window_obj.name = params.get('name', 'Window')
     
     # Assign IFC class
     bpy.ops.bim.assign_class(ifc_class="IfcWindow", predefined_type="WINDOW", userdefined_type="")
+    
+    # Apply material (glass-like)
+    apply_material(window_obj, color, f"Glass_{color}")
     
     return window_obj
 
@@ -131,14 +224,19 @@ def create_column(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#8b8b8b')
     
     # Create column
     bpy.ops.mesh.primitive_cube_add(size=1, location=(x, y, z + height/2))
     column_obj = bpy.context.active_object
     column_obj.scale = (width, depth, height)
+    column_obj.name = params.get('name', 'Column')
     
     # Assign IFC class
     bpy.ops.bim.assign_class(ifc_class="IfcColumn", predefined_type="COLUMN", userdefined_type="")
+    
+    # Apply material
+    apply_material(column_obj, color, f"Steel_{color}")
     
     return column_obj
 
@@ -151,6 +249,7 @@ def create_beam(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 3.0)
+    color = params.get('color', '#a0a0a0')
     
     print(f"Creating beam: L={length}m, W={width}m, H={height}m at ({x}, {y}, {z})")
     
@@ -175,6 +274,9 @@ def create_beam(params: dict):
         print(f"ERROR assigning IFC class: {e}")
         raise
     
+    # Apply material
+    apply_material(beam_obj, color, f"Steel_{color}")
+    
     return beam_obj
 
 def create_roof(params: dict):
@@ -186,14 +288,19 @@ def create_roof(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 6.0)
+    color = params.get('color', '#8b0000')
     
     # Create roof slab
     bpy.ops.mesh.primitive_cube_add(size=1, location=(x + length/2, y + width/2, z))
     roof_obj = bpy.context.active_object
     roof_obj.scale = (length, width, thickness)
+    roof_obj.name = params.get('name', 'Roof')
     
     # Assign IFC class
     bpy.ops.bim.assign_class(ifc_class="IfcRoof", predefined_type="FLAT_ROOF", userdefined_type="")
+    
+    # Apply material
+    apply_material(roof_obj, color, f"Roofing_{color}")
     
     return roof_obj
 
@@ -205,6 +312,7 @@ def create_box(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#808080')
     
     bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + depth/2, z + height/2))
     obj = bpy.context.active_object
@@ -212,6 +320,7 @@ def create_box(params: dict):
     obj.name = params.get('name', 'Box')
     
     bpy.ops.bim.assign_class(ifc_class="IfcBuildingElementProxy", predefined_type="ELEMENT", userdefined_type="")
+    apply_material(obj, color, f"Element_{color}")
     return obj
 
 def create_cylinder(params: dict):
@@ -221,12 +330,14 @@ def create_cylinder(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#a0a0a0')
     
     bpy.ops.mesh.primitive_cylinder_add(radius=radius, depth=height, location=(x, y, z + height/2))
     obj = bpy.context.active_object
     obj.name = params.get('name', 'Cylinder')
     
     bpy.ops.bim.assign_class(ifc_class="IfcColumn", predefined_type="COLUMN", userdefined_type="")
+    apply_material(obj, color, f"Steel_{color}")
     return obj
 
 def create_sphere(params: dict):
@@ -235,12 +346,14 @@ def create_sphere(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#ff6b6b')
     
     bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, location=(x, y, z))
     obj = bpy.context.active_object
     obj.name = params.get('name', 'Sphere')
     
     bpy.ops.bim.assign_class(ifc_class="IfcBuildingElementProxy", predefined_type="ELEMENT", userdefined_type="")
+    apply_material(obj, color, f"Element_{color}")
     return obj
 
 def create_cone(params: dict):
@@ -250,12 +363,14 @@ def create_cone(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#ffd700')
     
     bpy.ops.mesh.primitive_cone_add(radius1=radius, depth=height, location=(x, y, z + height/2))
     obj = bpy.context.active_object
     obj.name = params.get('name', 'Cone')
     
     bpy.ops.bim.assign_class(ifc_class="IfcBuildingElementProxy", predefined_type="ELEMENT", userdefined_type="")
+    apply_material(obj, color, f"Element_{color}")
     return obj
 
 def create_torus(params: dict):
@@ -265,12 +380,14 @@ def create_torus(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#4ecdc4')
     
     bpy.ops.mesh.primitive_torus_add(major_radius=radius, minor_radius=tube, location=(x, y, z))
     obj = bpy.context.active_object
     obj.name = params.get('name', 'Torus')
     
     bpy.ops.bim.assign_class(ifc_class="IfcBuildingElementProxy", predefined_type="ELEMENT", userdefined_type="")
+    apply_material(obj, color, f"Element_{color}")
     return obj
 
 def create_plane(params: dict):
@@ -280,6 +397,7 @@ def create_plane(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#c0c0c0')
     
     bpy.ops.mesh.primitive_plane_add(size=1, location=(x + width/2, y + height/2, z))
     obj = bpy.context.active_object
@@ -287,6 +405,7 @@ def create_plane(params: dict):
     obj.name = params.get('name', 'Plane')
     
     bpy.ops.bim.assign_class(ifc_class="IfcSlab", predefined_type="FLOOR", userdefined_type="")
+    apply_material(obj, color, f"Surface_{color}")
     return obj
 
 # ===== STRUCTURAL FOUNDATIONS =====
@@ -298,6 +417,7 @@ def create_footing(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', -0.5)
+    color = params.get('color', '#6b6b6b')
     
     bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + depth/2, z + thickness/2))
     obj = bpy.context.active_object
@@ -305,6 +425,7 @@ def create_footing(params: dict):
     obj.name = params.get('name', 'Footing')
     
     bpy.ops.bim.assign_class(ifc_class="IfcFooting", predefined_type="PAD_FOOTING", userdefined_type="")
+    apply_material(obj, color, f"Concrete_{color}")
     return obj
 
 def create_pile(params: dict):
@@ -527,6 +648,7 @@ def create_pipe(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#4169e1')
     
     bpy.ops.mesh.primitive_cylinder_add(radius=diameter/2, depth=length, location=(x + length/2, y, z))
     obj = bpy.context.active_object
@@ -534,6 +656,7 @@ def create_pipe(params: dict):
     obj.name = params.get('name', 'Pipe')
     
     bpy.ops.bim.assign_class(ifc_class="IfcPipeSegment", predefined_type="RIGIDSEGMENT", userdefined_type="")
+    apply_material(obj, color, f"Pipe_{color}")
     return obj
 
 def create_cable_carrier(params: dict):
@@ -673,6 +796,7 @@ def create_furniture(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#8b4513')
     
     bpy.ops.mesh.primitive_cube_add(size=1, location=(x + width/2, y + depth/2, z + height/2))
     obj = bpy.context.active_object
@@ -680,6 +804,7 @@ def create_furniture(params: dict):
     obj.name = params.get('name', 'Furniture')
     
     bpy.ops.bim.assign_class(ifc_class="IfcFurniture", predefined_type="USERDEFINED", userdefined_type="")
+    apply_material(obj, color, f"Wood_{color}")
     return obj
 
 def create_cabinet(params: dict):
@@ -795,6 +920,7 @@ def create_stairs(params: dict):
     x = params.get('x', 0.0)
     y = params.get('y', 0.0)
     z = params.get('z', 0.0)
+    color = params.get('color', '#c0c0c0')
     
     total_height = step_height * steps
     total_length = step_depth * steps
@@ -810,6 +936,9 @@ def create_stairs(params: dict):
         )
         step_obj = bpy.context.active_object
         step_obj.scale = (width, step_depth, step_height)
+        
+        # Apply material to each step
+        apply_material(step_obj, color, f"Stairs_{color}")
         
         if i == 0:
             # Only assign IFC class to the first step (representing the whole stair)
