@@ -6,6 +6,7 @@ import bpy
 import sys
 import json
 import argparse
+import traceback
 from pathlib import Path
 
 print("Starting BlenderBIM IFC Generator")
@@ -1033,8 +1034,14 @@ def main():
     print(f"Creating IFC project: {project_name}")
     print(f"Processing {len(tool_calls)} tool calls")
     
-    # Create project
-    ifc_file, storey = create_project(project_name)
+    try:
+        # Create project
+        ifc_file, storey = create_project(project_name)
+        print("✓ IFC project created successfully")
+    except Exception as e:
+        print(f"ERROR creating IFC project: {e}")
+        traceback.print_exc()
+        sys.exit(1)
     
     # Process tool calls
     for i, call in enumerate(tool_calls):
@@ -1048,38 +1055,65 @@ def main():
                 ELEMENT_HANDLERS[function](params)
             except Exception as e:
                 print(f"Warning: Failed to create {function}: {e}")
+                traceback.print_exc()
         else:
             print(f"Warning: Unknown function {function}")
     
-    # Verify IFC file exists
-    ifc_file = IfcStore.get_file()
-    if not ifc_file:
-        print("ERROR: No IFC file in store")
+    # Verify IFC file exists and has elements
+    try:
+        ifc_file = IfcStore.get_file()
+        if not ifc_file:
+            print("ERROR: No IFC file in store after processing")
+            sys.exit(1)
+        
+        elements = ifc_file.by_type("IfcProduct")
+        print(f"Total IFC elements created: {len(elements)}")
+        
+        if len(elements) == 0:
+            print("WARNING: No IFC elements created - model may be empty")
+    except Exception as e:
+        print(f"ERROR checking IFC file: {e}")
         sys.exit(1)
-    
-    elements = ifc_file.by_type("IfcProduct")
-    print(f"Total IFC elements created: {len(elements)}")
-    
-    if len(elements) == 0:
-        print("WARNING: No IFC elements created")
     
     # Save IFC file
     print(f"Saving IFC to: {args.output}")
     try:
+        # Use the export operator
         bpy.ops.export_ifc.bim(filepath=args.output)
-        print(f"IFC export completed")
+        print(f"✓ IFC export operator completed")
     except Exception as e:
-        print(f"ERROR during IFC export: {e}")
-        raise
+        print(f"ERROR using export operator: {e}")
+        print("Attempting fallback direct write...")
+        try:
+            ifc_file = IfcStore.get_file()
+            if ifc_file:
+                ifc_file.write(args.output)
+                print(f"✓ Direct write completed")
+            else:
+                print(f"ERROR: No IFC file to write")
+                sys.exit(1)
+        except Exception as e2:
+            print(f"ERROR during fallback write: {e2}")
+            traceback.print_exc()
+            sys.exit(1)
     
     # Verify output file exists
     from pathlib import Path
-    if not Path(args.output).exists():
-        print(f"ERROR: Output file not created at {args.output}")
+    try:
+        if not Path(args.output).exists():
+            print(f"ERROR: Output file not created at {args.output}")
+            sys.exit(1)
+        
+        file_size = Path(args.output).stat().st_size
+        if file_size == 0:
+            print(f"ERROR: Output file is empty at {args.output}")
+            sys.exit(1)
+        
+        print(f"✓ IFC generation complete! File size: {file_size} bytes")
+    except Exception as e:
+        print(f"ERROR verifying output file: {e}")
         sys.exit(1)
-    
-    file_size = Path(args.output).stat().st_size
-    print(f"IFC generation complete! File size: {file_size} bytes")
 
 if __name__ == "__main__":
     main()
+
