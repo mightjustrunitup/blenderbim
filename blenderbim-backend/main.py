@@ -23,12 +23,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class ToolCall(BaseModel):
-    function: str
-    params: Dict[str, Any]
-
 class IFCGenerateRequest(BaseModel):
-    tool_calls: List[ToolCall]
+    python_code: str
     project_name: Optional[str] = "AI Generated BIM Model"
 
 @app.get("/health")
@@ -59,35 +55,32 @@ async def health_check():
 @app.post("/generate-ifc")
 async def generate_ifc(request: IFCGenerateRequest):
     """
-    Generate IFC file using BlenderBIM based on tool calls
+    Generate IFC file using BlenderBIM by executing Python code
     """
     logger.info(f"Generating IFC for project: {request.project_name}")
-    logger.info(f"Tool calls: {len(request.tool_calls)}")
+    logger.info(f"Python code length: {len(request.python_code)} chars")
     
-    # Create temporary files
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as input_file:
-        input_path = input_file.name
-        json.dump({
-            "project_name": request.project_name,
-            "tool_calls": [call.dict() for call in request.tool_calls]
-        }, input_file)
+    # Create temporary files for Python code
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as code_file:
+        code_path = code_file.name
+        code_file.write(request.python_code)
     
     output_path = tempfile.mktemp(suffix='.ifc')
     
     try:
-        # Run Blender in background mode with our generator script
-        blender_script = "/app/blender_generator.py"
+        # Run Blender in background mode: execute user code, then export
+        logger.info(f"Running Blender with code: {code_path}, output: {output_path}")
         
-        logger.info(f"Running Blender with input: {input_path}, output: {output_path}")
-        
+        # First execute user's code, then run export script
         process = subprocess.run(
             [
                 "blender",
                 "--background",
-                "--python", blender_script,
+                "--python", code_path,  # Execute user's BlenderBIM code
+                "--python", "/app/execute_code.py",  # Then export IFC
                 "--",
-                "--input", input_path,
-                "--output", output_path
+                "--output", output_path,
+                "--project-name", request.project_name
             ],
             capture_output=True,
             text=True,
@@ -130,8 +123,8 @@ async def generate_ifc(request: IFCGenerateRequest):
         logger.error(f"Error generating IFC: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        # Cleanup input file
+        # Cleanup code file
         try:
-            os.unlink(input_path)
+            os.unlink(code_path)
         except:
             pass
