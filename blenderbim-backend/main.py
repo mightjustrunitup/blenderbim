@@ -66,16 +66,11 @@ async def generate_ifc(request: IFCGenerateRequest):
     combined_code = f"""
 import sys
 import traceback
-import os
-
-# Output path for later reference
-OUTPUT_PATH = r"{output_path}"
 
 try:
     print("=" * 80)
     print("Starting BlenderBIM script execution...")
     print("=" * 80)
-    print(f"Output will be saved to: {{OUTPUT_PATH}}")
     
     {request.python_code}
     
@@ -92,56 +87,40 @@ except Exception as e:
     print("=" * 80)
     sys.exit(1)
 
-# Export the IFC file using BlenderBIM
+# Export the IFC file
 try:
     print("=" * 80)
     print("Starting IFC export...")
     print("=" * 80)
     
-    import bpy
     from blenderbim.bim.ifc import IfcStore
+    import os
     
-    print(f"Exporting IFC to: {{OUTPUT_PATH}}")
+    print(f"Exporting IFC to: {output_path}")
     
-    # Get the IFC file from the store
-    ifc_file = IfcStore.get_file()
+    # Try both methods to get IFC file
+    ifc_file = IfcStore.file if hasattr(IfcStore, 'file') and IfcStore.file else IfcStore.get_file()
     
     if not ifc_file:
         print("ERROR: No IFC project found in IfcStore")
-        print("Debugging info:")
-        print(f"  IfcStore.file = {{getattr(IfcStore, 'file', 'not set')}}")
-        print(f"  Available projects = {{IfcStore.projects}}")
+        print(f"IfcStore.file = {{IfcStore.file if hasattr(IfcStore, 'file') else 'not set'}}")
+        print(f"IfcStore.get_file() = {{IfcStore.get_file()}}")
         sys.exit(1)
     
-    print(f"✓ IFC file found in store")
-    print(f"  Elements in project: {{len(ifc_file.by_type('IfcProduct'))}}")
+    print(f"IFC file found: {{ifc_file}}")
+    print(f"Writing to: {output_path}")
     
-    # Export using BlenderBIM's built-in export operator
-    print("Attempting BlenderBIM export operator...")
-    try:
-        bpy.ops.export_ifc.bim(filepath=OUTPUT_PATH)
-        print("✓ BlenderBIM export operator completed")
-    except Exception as e:
-        print(f"BlenderBIM operator failed: {{e}}, trying fallback method...")
-        # Fallback: write IFC file directly
-        print("Attempting direct IFC file write...")
-        ifc_file.write(OUTPUT_PATH)
-        print("✓ Direct write completed")
+    ifc_file.write("{output_path}")
+    print(f"✓ IFC file write command completed")
     
-    # Verify the output file
-    if os.path.exists(OUTPUT_PATH):
-        file_size = os.path.getsize(OUTPUT_PATH)
+    if os.path.exists("{output_path}"):
+        file_size = os.path.getsize("{output_path}")
         print(f"✓ File verified: {{file_size}} bytes")
-        if file_size == 0:
-            print("WARNING: Output file is empty!")
-            sys.exit(1)
         print("=" * 80)
         print("SUCCESS: IFC file generated successfully!")
         print("=" * 80)
     else:
-        print(f"ERROR: Output file was not created at {{OUTPUT_PATH}}")
-        print(f"  Directory exists: {{os.path.exists(os.path.dirname(OUTPUT_PATH))}}")
-        print(f"  Directory: {{os.path.dirname(OUTPUT_PATH) or 'current directory'}}")
+        print("ERROR: Output file was not created by write() command")
         sys.exit(1)
         
 except Exception as e:
@@ -162,7 +141,6 @@ except Exception as e:
     try:
         # Run Blender in background mode with combined script
         logger.info(f"Running Blender with code: {code_path}, output: {output_path}")
-        logger.info(f"Blender command: blender --background --python {code_path}")
         
         process = subprocess.run(
             [
@@ -186,23 +164,19 @@ except Exception as e:
             logger.info(process.stderr)
             logger.info("=" * 80)
         
-        # Log return code
-        logger.info(f"Blender exit code: {process.returncode}")
-        
         if process.returncode != 0:
-            error_detail = f"Blender process exited with code: {process.returncode}\n"
-            error_detail += f"STDERR: {process.stderr}\n"
-            error_detail += f"STDOUT (last 1000 chars): {process.stdout[-1000:] if len(process.stdout) > 1000 else process.stdout}"
-            logger.error(error_detail)
+            logger.error(f"Blender process exited with code: {process.returncode}")
             raise HTTPException(
                 status_code=500,
-                detail=error_detail
+                detail=f"Blender generation failed (exit code {process.returncode}): {process.stderr or process.stdout}"
             )
         
         # Check if output file was created
         if not os.path.exists(output_path):
             error_msg = f"IFC file was not generated at {output_path}. "
-            error_msg += f"Blender output (last 1000 chars): {process.stdout[-1000:] if len(process.stdout) > 1000 else process.stdout}"
+            error_msg += f"Blender output (last 2000 chars): {process.stdout[-2000:] if len(process.stdout) > 2000 else process.stdout}"
+            if process.stderr:
+                error_msg += f"\nBlender stderr: {process.stderr[-1000:]}"
             logger.error(error_msg)
             raise HTTPException(
                 status_code=500,
@@ -210,14 +184,6 @@ except Exception as e:
             )
         
         file_size = os.path.getsize(output_path)
-        
-        if file_size == 0:
-            logger.error(f"Generated IFC file is empty: {file_size} bytes")
-            raise HTTPException(
-                status_code=500,
-                detail=f"IFC file was generated but is empty (0 bytes)"
-            )
-        
         logger.info(f"Generated IFC file: {file_size} bytes")
         
         # Return the IFC file
@@ -242,5 +208,6 @@ except Exception as e:
             os.unlink(code_path)
         except:
             pass
+
 
 
