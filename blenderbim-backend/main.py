@@ -60,27 +60,48 @@ async def generate_ifc(request: IFCGenerateRequest):
     logger.info(f"Generating IFC for project: {request.project_name}")
     logger.info(f"Python code length: {len(request.python_code)} chars")
     
-    # Create temporary files for Python code
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as code_file:
-        code_path = code_file.name
-        code_file.write(request.python_code)
-    
     output_path = tempfile.mktemp(suffix='.ifc')
     
+    # Combine user code with export logic into a single script
+    combined_code = f"""{request.python_code}
+
+# Export the IFC file
+import sys
+from blenderbim.bim.ifc import IfcStore
+
+print(f"Exporting IFC to: {output_path}")
+ifc_file = IfcStore.get_file()
+
+if not ifc_file:
+    print("ERROR: No IFC project found in store")
+    sys.exit(1)
+
+ifc_file.write("{output_path}")
+print(f"✓ IFC file written successfully: {output_path}")
+
+import os
+if os.path.exists("{output_path}"):
+    file_size = os.path.getsize("{output_path}")
+    print(f"✓ File verified: {{file_size}} bytes")
+else:
+    print("ERROR: Output file was not created")
+    sys.exit(1)
+"""
+    
+    # Create temporary file with combined code
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as code_file:
+        code_path = code_file.name
+        code_file.write(combined_code)
+    
     try:
-        # Run Blender in background mode: execute user code, then export
+        # Run Blender in background mode with combined script
         logger.info(f"Running Blender with code: {code_path}, output: {output_path}")
         
-        # First execute user's code, then run export script
         process = subprocess.run(
             [
                 "blender",
                 "--background",
-                "--python", code_path,  # Execute user's BlenderBIM code
-                "--python", "/app/execute_code.py",  # Then export IFC
-                "--",
-                "--output", output_path,
-                "--project-name", request.project_name
+                "--python", code_path
             ],
             capture_output=True,
             text=True,
