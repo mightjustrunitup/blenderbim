@@ -62,22 +62,28 @@ async def generate_ifc(request: IFCGenerateRequest):
     
     output_path = tempfile.mktemp(suffix='.ifc')
     
-    # Wrap user code in comprehensive error handling
+    # Indent user code for function body
+    indented_code = '\n'.join('    ' + line if line.strip() else '' for line in request.python_code.split('\n'))
+    
+    # Create a wrapper function with proper error handling
     combined_code = f"""
 import sys
 import traceback
 
+def __execute_user_code__():
+    '''Wrapper function to isolate user code execution'''
+{indented_code}
+
+# Execute user code with error handling
+print("=" * 80)
+print("Starting BlenderBIM script execution...")
+print("=" * 80)
+
 try:
-    print("=" * 80)
-    print("Starting BlenderBIM script execution...")
-    print("=" * 80)
-    
-    {request.python_code}
-    
+    __execute_user_code__()
     print("=" * 80)
     print("User code executed successfully!")
     print("=" * 80)
-    
 except Exception as e:
     print("=" * 80)
     print(f"ERROR in user code: {{type(e).__name__}}: {{str(e)}}")
@@ -208,6 +214,7 @@ except Exception as e:
             os.unlink(code_path)
         except:
             pass
+
 
 
 
