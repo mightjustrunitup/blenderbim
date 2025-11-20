@@ -93,6 +93,9 @@ def validate_python_code(code: str) -> tuple[bool, Optional[str]]:
 
 def wrap_code_with_safety(user_code: str, project_name: str, output_path: str) -> str:
     """Wrap user code with proper imports and error handling"""
+    # Indent user code properly
+    indented_code = '\n'.join('    ' + line if line.strip() else '' for line in user_code.split('\n'))
+    
     wrapper = f'''
 import sys
 import traceback
@@ -103,7 +106,7 @@ from blenderbim.bim.ifc import IfcStore
 
 try:
     # === BEGIN USER CODE ===
-{user_code}
+{indented_code}
     # === END USER CODE ===
     
     # Store in IfcStore for export
@@ -283,6 +286,7 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
