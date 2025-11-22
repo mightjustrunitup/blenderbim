@@ -28,11 +28,11 @@ RUN wget -q https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-
     rm blender-4.2.0-linux-x64.tar.xz && \
     ln -s /opt/blender/blender /usr/local/bin/blender
 
-# Install BlenderBIM (Nightly, correct file)
-RUN wget -q https://nightly.ifcopenshell.org/blenderbim/2409/blenderbim-2409-linux-py311.zip && \
+# Install BlenderBIM (blenderbim-240602, Python 3.11)
+RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240602/blenderbim-240602-py311-linux.zip && \
     mkdir -p /root/.config/blender/4.2/scripts/addons && \
-    unzip -q blenderbim-2409-linux-py311.zip -d /root/.config/blender/4.2/scripts/addons/ && \
-    rm blenderbim-2409-linux-py311.zip
+    unzip -q blenderbim-240602-py311-linux.zip -d /root/.config/blender/4.2/scripts/addons/ && \
+    rm blenderbim-240602-py311-linux.zip
 
 # Fix Shapely & LXML inside Blender’s Python
 RUN /opt/blender/4.2/python/bin/python3.11 -m ensurepip && \
@@ -43,20 +43,20 @@ RUN /opt/blender/4.2/python/bin/python3.11 -m ensurepip && \
 RUN blender --background --python-expr \
     "import bpy; bpy.ops.preferences.addon_enable(module='blenderbim'); bpy.ops.wm.save_userpref()"
 
-# Install Python dependencies
+# Install Python dependencies for your app
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# Copy your application files
 COPY main.py .
 COPY blender_generator.py .
 COPY start.sh .
 
 RUN chmod +x start.sh
 
-
-
-
+# Expose the port and start the app
 EXPOSE ${PORT}
 
 CMD ["./start.sh"]
+
 
