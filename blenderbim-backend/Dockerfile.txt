@@ -1,13 +1,13 @@
 FROM ubuntu:22.04
 
-# Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-# Install system dependencies
+# System dependencies
 RUN apt-get update && apt-get install -y \
     wget \
+    unzip \
     bzip2 \
     libfreetype6 \
     libgl1-mesa-glx \
@@ -21,34 +21,33 @@ RUN apt-get update && apt-get install -y \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and install Blender 4.2.0 (latest stable)
+# Install Blender 4.2.0
 RUN wget -q https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz && \
     tar -xf blender-4.2.0-linux-x64.tar.xz && \
     mv blender-4.2.0-linux-x64 /opt/blender && \
     rm blender-4.2.0-linux-x64.tar.xz && \
     ln -s /opt/blender/blender /usr/local/bin/blender
 
-# Install BlenderBIM addon (last stable release before Bonsai rename)
-RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240115/blenderbim-240115-py311-linux.zip && \
+# Install BlenderBIM Nightly (Compatible with Blender 4.2 + Python 3.11)
+RUN wget -q https://nightly.ifcopenshell.org/blender-bim/blenderbim-2409-py311-linux.zip && \
     mkdir -p /root/.config/blender/4.2/scripts/addons && \
-    unzip -q blenderbim-240115-py311-linux.zip -d /root/.config/blender/4.2/scripts/addons/ && \
-    rm blenderbim-240115-py311-linux.zip && \
-    rm -rf /root/.config/blender/4.2/scripts/addons/blenderbim/libs/site/packages/shapely && \
-    rm -rf /root/.config/blender/4.2/scripts/addons/blenderbim/libs/site/packages/lxml
+    unzip -q blenderbim-2409-py311-linux.zip -d /root/.config/blender/4.2/scripts/addons/ && \
+    rm blenderbim-2409-py311-linux.zip
 
-# Install required dependencies into Blender's Python environment (required by BlenderBIM)
+# Fix Shapely & LXML inside Blender's Python
 RUN /opt/blender/4.2/python/bin/python3.11 -m ensurepip && \
     /opt/blender/4.2/python/bin/python3.11 -m pip install --upgrade pip && \
     /opt/blender/4.2/python/bin/python3.11 -m pip install shapely==2.0.2 lxml==5.1.0
 
 # Enable BlenderBIM addon
-RUN blender --background --python-expr "import bpy; bpy.ops.preferences.addon_enable(module='blenderbim'); bpy.ops.wm.save_userpref()"
+RUN blender --background --python-expr \
+    "import bpy; bpy.ops.preferences.addon_enable(module='blenderbim'); bpy.ops.wm.save_userpref()"
 
-# Install Python dependencies
+# Install normal Python dependencies
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copy application files
+# Copy backend files
 COPY main.py .
 COPY blender_generator.py .
 COPY start.sh .
@@ -58,3 +57,4 @@ RUN chmod +x start.sh
 EXPOSE ${PORT}
 
 CMD ["./start.sh"]
+
