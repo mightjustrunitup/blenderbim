@@ -23,25 +23,25 @@ RUN apt-get update && apt-get install -y \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and install Blender 4.0
-RUN wget -q https://download.blender.org/release/Blender4.0/blender-4.0.2-linux-x64.tar.xz && \
-    tar -xf blender-4.0.2-linux-x64.tar.xz && \
-    mv blender-4.0.2-linux-x64 /opt/blender && \
-    rm blender-4.0.2-linux-x64.tar.xz && \
+# Download and install Blender 4.2.0 (latest stable)
+RUN wget -q https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz && \
+    tar -xf blender-4.2.0-linux-x64.tar.xz && \
+    mv blender-4.2.0-linux-x64 /opt/blender && \
+    rm blender-4.2.0-linux-x64.tar.xz && \
     ln -s /opt/blender/blender /usr/local/bin/blender
 
-# Install BlenderBIM addon
-RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240115/blenderbim-240115-py311-linux.zip && \
-    mkdir -p /root/.config/blender/4.0/scripts/addons && \
-    unzip -q blenderbim-240115-py311-linux.zip -d /root/.config/blender/4.0/scripts/addons/ && \
-    rm blenderbim-240115-py311-linux.zip && \
-    rm -rf /root/.config/blender/4.0/scripts/addons/blenderbim/libs/site/packages/shapely && \
-    rm -rf /root/.config/blender/4.0/scripts/addons/blenderbim/libs/site/packages/lxml
+# Install latest BlenderBIM addon (250201 - Feb 2025)
+RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-250201/blenderbim-250201-py311-linux.zip && \
+    mkdir -p /root/.config/blender/4.2/scripts/addons && \
+    unzip -q blenderbim-250201-py311-linux.zip -d /root/.config/blender/4.2/scripts/addons/ && \
+    rm blenderbim-250201-py311-linux.zip && \
+    rm -rf /root/.config/blender/4.2/scripts/addons/blenderbim/libs/site/packages/shapely && \
+    rm -rf /root/.config/blender/4.2/scripts/addons/blenderbim/libs/site/packages/lxml
 
 # Install required dependencies into Blender's Python environment (required by BlenderBIM)
-RUN /opt/blender/4.0/python/bin/python3.10 -m ensurepip && \
-    /opt/blender/4.0/python/bin/python3.10 -m pip install --upgrade pip && \
-    /opt/blender/4.0/python/bin/python3.10 -m pip install shapely==2.0.2 lxml==5.1.0
+RUN /opt/blender/4.2/python/bin/python3.11 -m ensurepip && \
+    /opt/blender/4.2/python/bin/python3.11 -m pip install --upgrade pip && \
+    /opt/blender/4.2/python/bin/python3.11 -m pip install shapely==2.0.2 lxml==5.1.0
 
 # Enable BlenderBIM addon
 RUN blender --background --python-expr "import bpy; bpy.ops.preferences.addon_enable(module='blenderbim'); bpy.ops.wm.save_userpref()"
