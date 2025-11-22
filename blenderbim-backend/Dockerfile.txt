@@ -9,13 +9,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     wget \
     bzip2 \
-    unzip \
     libfreetype6 \
     libgl1-mesa-glx \
     libglu1-mesa \
     libxi6 \
     libxrender1 \
-    libxkbcommon0 \
     libgomp1 \
     libgeos-dev \
     python3.11 \
@@ -30,11 +28,11 @@ RUN wget -q https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-
     rm blender-4.2.0-linux-x64.tar.xz && \
     ln -s /opt/blender/blender /usr/local/bin/blender
 
-# Install latest BlenderBIM addon (250201 - Feb 2025)
-RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-250201/blenderbim-250201-py311-linux.zip && \
+# Install BlenderBIM addon (last stable release before Bonsai rename)
+RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240115/blenderbim-240115-py311-linux.zip && \
     mkdir -p /root/.config/blender/4.2/scripts/addons && \
-    unzip -q blenderbim-250201-py311-linux.zip -d /root/.config/blender/4.2/scripts/addons/ && \
-    rm blenderbim-250201-py311-linux.zip && \
+    unzip -q blenderbim-240115-py311-linux.zip -d /root/.config/blender/4.2/scripts/addons/ && \
+    rm blenderbim-240115-py311-linux.zip && \
     rm -rf /root/.config/blender/4.2/scripts/addons/blenderbim/libs/site/packages/shapely && \
     rm -rf /root/.config/blender/4.2/scripts/addons/blenderbim/libs/site/packages/lxml
 
