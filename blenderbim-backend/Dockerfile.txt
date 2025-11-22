@@ -28,13 +28,13 @@ RUN wget -q https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-
     rm blender-4.2.0-linux-x64.tar.xz && \
     ln -s /opt/blender/blender /usr/local/bin/blender
 
-# Install BlenderBIM Nightly (Compatible with Blender 4.2 + Python 3.11)
-RUN wget -q https://nightly.ifcopenshell.org/blender-bim/blenderbim-2409-py311-linux.zip && \
+# Install BlenderBIM (Nightly, correct file)
+RUN wget -q https://nightly.ifcopenshell.org/blenderbim/2409/blenderbim-2409-linux-py311.zip && \
     mkdir -p /root/.config/blender/4.2/scripts/addons && \
-    unzip -q blenderbim-2409-py311-linux.zip -d /root/.config/blender/4.2/scripts/addons/ && \
-    rm blenderbim-2409-py311-linux.zip
+    unzip -q blenderbim-2409-linux-py311.zip -d /root/.config/blender/4.2/scripts/addons/ && \
+    rm blenderbim-2409-linux-py311.zip
 
-# Fix Shapely & LXML inside Blender's Python
+# Fix Shapely & LXML inside Blender’s Python
 RUN /opt/blender/4.2/python/bin/python3.11 -m ensurepip && \
     /opt/blender/4.2/python/bin/python3.11 -m pip install --upgrade pip && \
     /opt/blender/4.2/python/bin/python3.11 -m pip install shapely==2.0.2 lxml==5.1.0
@@ -43,16 +43,18 @@ RUN /opt/blender/4.2/python/bin/python3.11 -m ensurepip && \
 RUN blender --background --python-expr \
     "import bpy; bpy.ops.preferences.addon_enable(module='blenderbim'); bpy.ops.wm.save_userpref()"
 
-# Install normal Python dependencies
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copy backend files
 COPY main.py .
 COPY blender_generator.py .
 COPY start.sh .
 
 RUN chmod +x start.sh
+
+
+
 
 EXPOSE ${PORT}
 
