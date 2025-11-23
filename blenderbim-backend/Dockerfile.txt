@@ -35,7 +35,7 @@ RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blend
     unzip -q blenderbim-240602-py311-linux.zip -d /root/.config/blender/4.2/scripts/addons/ && \
     rm blenderbim-240602-py311-linux.zip
 
-# Fix Shapely & LXML inside Blender’s Python environment
+# Fix Shapely & LXML inside Blender’s Python
 RUN /opt/blender/4.2/python/bin/python3.11 -m ensurepip && \
     /opt/blender/4.2/python/bin/python3.11 -m pip install --upgrade pip && \
     /opt/blender/4.2/python/bin/python3.11 -m pip install shapely==2.0.2 lxml==5.1.0
@@ -44,28 +44,27 @@ RUN /opt/blender/4.2/python/bin/python3.11 -m ensurepip && \
 RUN blender --background --python-expr \
     "import bpy; bpy.ops.preferences.addon_enable(module='blenderbim'); bpy.ops.wm.save_userpref()"
 
+# ----------------------------------------------------------
+# Extract available IFC API toolset inside Blender
+# ----------------------------------------------------------
+RUN echo "import pkgutil, ifcopenshell.api\nfor m in pkgutil.walk_packages(ifcopenshell.api.__path__, prefix='ifcopenshell.api.'):\n    print(m.name)" > /tmp/list_api.py
+
+RUN blender --background --python /tmp/list_api.py > /api_toolset.txt
+
+# ----------------------------------------------------------
+
 # Install Python dependencies for your application
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copy application files
 COPY main.py .
 COPY blender_generator.py .
 COPY start.sh .
 
 RUN chmod +x start.sh
 
-# ----------------------------------------------------------
-# 🔥 Added: Extract full IfcOpenShell API list to build logs
-# ----------------------------------------------------------
-RUN /opt/blender/4.2/python/bin/python3.11 - << 'EOF'
-import pkgutil, ifcopenshell.api
-for m in pkgutil.walk_packages(ifcopenshell.api.__path__, prefix="ifcopenshell.api."):
-    print(m.name)
-EOF
-
-# Expose port and set entrypoint
 EXPOSE ${PORT}
+
 CMD ["./start.sh"]
 
 
