@@ -35,14 +35,25 @@ async def health():
         result = subprocess.run(["blender", "--version"], capture_output=True, text=True, timeout=5)
         return {
             "status": "healthy" if result.returncode == 0 else "degraded",
-            "blender": result.stdout.split('\n')[0] if result.returncode == 0 else "N/A"
+            "blender": result.stdout.split('\n'),[object Object], if result.returncode == 0 else "N/A"
         }
     except:
         return {"status": "unhealthy"}
 
+@app.get("/api-list")
+def get_api_list():
+    """Get list of available APIs from api_toolset.txt"""
+    path = "/app/api_toolset.txt"
+    if not os.path.exists(path):
+        return {"error": "api_toolset.txt not found"}
+    
+    with open(path, "r") as f:
+        content = f.read()
+    
+    return {"api": content.splitlines()}
+
 def wrap_code_with_safety(user_code: str, output_path: str) -> str:
     """Wrap user code with proper error handling and export logic"""
-    
     wrapper = f'''
 import sys
 import traceback
@@ -56,7 +67,7 @@ try:
     # === BEGIN USER CODE ===
 {chr(10).join("    " + line if line.strip() else "" for line in user_code.split(chr(10)))}
     # === END USER CODE ===
-    
+
     # Verify IFC file was created
     if 'ifc' not in locals():
         raise RuntimeError("Error: Variable 'ifc' not found. Code must create IFC file with: ifc = ifcopenshell.api.run('project.create_file', version='IFC4')")
@@ -70,7 +81,7 @@ try:
         raise RuntimeError("Error: No IFC products created. Ensure code creates elements (walls, columns, etc.)")
     
     print(f"✓ Success: Created {{len(products)}} IFC products")
-    
+
 except Exception as e:
     print(f"ERROR: {{type(e).__name__}}: {{str(e)}}", file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
@@ -97,7 +108,6 @@ async def generate_ifc(request: GenerateRequest):
     Generate IFC file from validated Python code
     Returns the IFC file directly
     """
-    
     temp_dir = Path(tempfile.mkdtemp())
     script_path = temp_dir / "generate.py"
     ifc_path = temp_dir / f"{request.project_name.replace(' ', '_')}.ifc"
@@ -107,7 +117,6 @@ async def generate_ifc(request: GenerateRequest):
         
         # Wrap code with safety
         wrapped = wrap_code_with_safety(request.python_code, str(ifc_path))
-        
         with open(script_path, 'w', encoding='utf-8') as f:
             f.write(wrapped)
         
@@ -177,7 +186,7 @@ async def generate_ifc(request: GenerateRequest):
             filename=f"{request.project_name}.ifc",
             headers={"X-File-Size": str(file_size)}
         )
-        
+    
     except subprocess.TimeoutExpired:
         logger.error("[Worker] Blender execution timeout (120s)")
         return {
