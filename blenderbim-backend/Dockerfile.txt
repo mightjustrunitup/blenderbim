@@ -55,7 +55,17 @@ COPY start.sh .
 
 RUN chmod +x start.sh
 
+# ----------------------------------------------------------
+# 🔥 Added: Extract full IfcOpenShell API list to build logs
+# ----------------------------------------------------------
+RUN /opt/blender/4.2/python/bin/python3.11 - << 'EOF'
+import pkgutil, ifcopenshell.api
+for m in pkgutil.walk_packages(ifcopenshell.api.__path__, prefix="ifcopenshell.api."):
+    print(m.name)
+EOF
+
 # Expose port and set entrypoint
 EXPOSE ${PORT}
 CMD ["./start.sh"]
+
 
