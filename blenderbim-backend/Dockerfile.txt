@@ -55,7 +55,7 @@ RUN blender --background --python-expr \
     "import bpy; bpy.ops.preferences.addon_enable(module='blenderbim'); bpy.ops.wm.save_userpref()"
 
 # -------------------------------------------------------
-# CREATE API NAME DUMP SCRIPT
+# CREATE API SIGNATURE DUMP SCRIPT
 # -------------------------------------------------------
 RUN echo "\
 import pkgutil, inspect, json\n\
@@ -76,9 +76,9 @@ with open('/app/api_signatures.json', 'w') as f:\n\
     json.dump(signatures, f, indent=2)\n" > /app/dump_signatures.py
 
 # -------------------------------------------------------
-# RUN SIGNATURE DUMP SCRIPT in Blender’s Python
+# RUN SIGNATURE DUMP SCRIPT INSIDE BLENDER
 # -------------------------------------------------------
-RUN /opt/blender/4.2/python/bin/python3.11 /app/dump_signatures.py || true
+RUN blender --background --python /app/dump_signatures.py
 
 # -------------------------------------------------------
 # COPY and INSTALL application dependencies
@@ -89,10 +89,10 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 COPY main.py .
 COPY blender_generator.py .
 COPY start.sh .
-
 RUN chmod +x start.sh
 
 EXPOSE ${PORT}
 CMD ["./start.sh"]
+
 
 
