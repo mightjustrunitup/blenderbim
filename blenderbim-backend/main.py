@@ -40,6 +40,12 @@ async def health():
     except:
         return {"status": "unhealthy"}
 
+@app.get("/dump-signatures")
+def get_signatures():
+    with open("/app/api_signatures.json") as f:
+        return json.load(f)
+
+
 def wrap_code_with_safety(user_code: str, output_path: str) -> str:
     """Wrap user code with proper error handling and export logic"""
     
