@@ -55,28 +55,44 @@ RUN blender --background --python-expr \
     "import bpy; bpy.ops.preferences.addon_enable(module='blenderbim'); bpy.ops.wm.save_userpref()"
 
 # -------------------------------------------------------
-# CREATE API DUMP SCRIPT
+# CREATE API NAME DUMP SCRIPT
 # -------------------------------------------------------
-RUN echo "import pkgutil, ifcopenshell.api\nfor m in pkgutil.walk_packages(ifcopenshell.api.__path__, prefix='ifcopenshell.api.'):\n    print(m.name)" \
-    > /app/dump_api.py
+RUN echo "\
+import pkgutil, inspect, json\n\
+import ifcopenshell.api\n\
+signatures = {}\n\
+for m in pkgutil.walk_packages(ifcopenshell.api.__path__, prefix='ifcopenshell.api.'):\n\
+    try:\n\
+        module = __import__(m.name, fromlist=[''])\n\
+    except ImportError:\n\
+        continue\n\
+    for name, obj in inspect.getmembers(module, inspect.isfunction):\n\
+        try:\n\
+            sig = str(inspect.signature(obj))\n\
+        except (ValueError, TypeError):\n\
+            sig = '()'\n\
+        signatures[f\"{m.name}.{name}\"] = sig\n\
+with open('/app/api_signatures.json', 'w') as f:\n\
+    json.dump(signatures, f, indent=2)\n" > /app/dump_signatures.py
 
 # -------------------------------------------------------
-# RUN SCRIPT INSIDE BLENDER (correct way)
+# RUN SIGNATURE DUMP SCRIPT in Blender’s Python
 # -------------------------------------------------------
-RUN blender --background --python /app/dump_api.py > /app/api_toolset.txt || true
+RUN /opt/blender/4.2/python/bin/python3.11 /app/dump_signatures.py || true
 
 # -------------------------------------------------------
-# Install app dependencies
+# COPY and INSTALL application dependencies
 # -------------------------------------------------------
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copy app
 COPY main.py .
 COPY blender_generator.py .
 COPY start.sh .
+
 RUN chmod +x start.sh
 
 EXPOSE ${PORT}
 CMD ["./start.sh"]
+
 
