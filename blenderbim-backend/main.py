@@ -4,7 +4,7 @@ import subprocess
 import logging
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -97,9 +97,18 @@ except Exception as export_error:
 '''
     return wrapper
 
+def cleanup_temp_dir(temp_dir: Path):
+    """Cleanup temporary directory after file is sent"""
+    try:
+        import shutil
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+            logger.debug(f"[Worker] Cleaned temp: {temp_dir}")
+    except Exception as e:
+        logger.error(f"[Worker] Cleanup failed: {e}")
 
 @app.post("/generate-ifc")
-async def generate_ifc(request: GenerateRequest):
+async def generate_ifc(request: GenerateRequest, background_tasks: BackgroundTasks):
 
     temp_dir = Path(tempfile.mkdtemp())
     script_path = temp_dir / "generate.py"
@@ -151,6 +160,9 @@ async def generate_ifc(request: GenerateRequest):
         
         file_size = ifc_path.stat().st_size
         logger.info(f"[Worker] ✓ IFC generated: {ifc_path} ({file_size} bytes)")
+
+        # Schedule cleanup AFTER file is sent
+        background_tasks.add_task(cleanup_temp_dir, temp_dir)
         
         return FileResponse(
             path=str(ifc_path),
@@ -158,15 +170,29 @@ async def generate_ifc(request: GenerateRequest):
             filename=f"{request.project_name}.ifc",
             headers={"X-File-Size": str(file_size)}
         )
-        
-    finally:
-        try:
-            import shutil
-            if temp_dir.exists():
-                shutil.rmtree(temp_dir)
-                logger.debug(f"[Worker] Cleaned temp: {temp_dir}")
-        except:
-            pass
+
+except subprocess.TimeoutExpired:
+        logger.error("[Worker] Blender execution timeout (120s)")
+        return {
+            "error": True,
+            "details": {
+                "error": "Blender execution timeout",
+                "hint": "Model is too complex. Simplify and retry."
+            }
+        }, 504
+    
+except Exception as e:
+        logger.exception(f"[Worker] Unexpected error: {str(e)}")
+        # Cleanup on error
+        cleanup_temp_dir(temp_dir)
+        return {
+            "error": True,
+            "details": {
+                "error": str(e),
+                "type": type(e).__name__
+            }
+        }, 500
+
 
 
 # ✅ ADDING YOUR /api-list ENDPOINT EXACTLY AS YOU ASKED
