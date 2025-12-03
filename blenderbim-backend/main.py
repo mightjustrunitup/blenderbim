@@ -3,18 +3,20 @@ import tempfile
 import subprocess
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
+
+from mcp_client import call_mcp_tool, get_mcp_tools, execute_tool_calls, export_ifc
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="BlenderBIM Worker", version="3.0.0")
+app = FastAPI(title="BlenderBIM Worker", version="4.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,8 +26,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Legacy request model (for backward compatibility)
 class GenerateRequest(BaseModel):
     python_code: str
+    project_name: str = "Generated Model"
+
+# New MCP-based request model
+class ToolCall(BaseModel):
+    tool: str
+    params: dict = {}
+
+class MCPGenerateRequest(BaseModel):
+    tool_calls: List[ToolCall]
     project_name: str = "Generated Model"
 
 @app.get("/health")
@@ -33,12 +45,127 @@ async def health():
     """Health check endpoint"""
     try:
         result = subprocess.run(["blender", "--version"], capture_output=True, text=True, timeout=5)
+        
+        # Also check MCP server
+        mcp_status = "unknown"
+        try:
+            tools = get_mcp_tools()
+            mcp_status = "healthy"
+        except:
+            mcp_status = "unavailable"
+        
         return {
             "status": "healthy" if result.returncode == 0 else "degraded",
-            "blender": result.stdout.split('\n')[0] if result.returncode == 0 else "N/A"
+            "blender": result.stdout.split('\n')[0] if result.returncode == 0 else "N/A",
+            "mcp_server": mcp_status
         }
     except:
         return {"status": "unhealthy"}
+
+@app.get("/mcp/tools")
+async def get_tools():
+    """Get available MCP4IFC tools manifest - complete schema for LLM"""
+    try:
+        tools = get_mcp_tools()
+        return tools
+    except Exception as e:
+        logger.error(f"Failed to get MCP tools: {e}")
+        return JSONResponse(
+            status_code=503,
+            content={"error": "MCP server unavailable", "details": str(e)}
+        )
+
+@app.get("/mcp/tools-for-llm")
+async def get_tools_for_llm():
+    """Get tools formatted for LLM function calling - ready to paste into prompt"""
+    try:
+        tools = get_mcp_tools()
+        # Format for OpenAI/Lovable AI function calling format
+        llm_tools = []
+        for tool in tools.get("tools", tools if isinstance(tools, list) else []):
+            llm_tools.append({
+                "type": "function",
+                "function": {
+                    "name": tool.get("name"),
+                    "description": tool.get("description"),
+                    "parameters": tool.get("inputSchema", tool.get("input_schema", {}))
+                }
+            })
+        return {"tools": llm_tools, "count": len(llm_tools)}
+    except Exception as e:
+        logger.error(f"Failed to format MCP tools for LLM: {e}")
+        return JSONResponse(
+            status_code=503,
+            content={"error": "MCP server unavailable", "details": str(e)}
+        )
+
+@app.post("/mcp/execute")
+async def execute_mcp_tools(request: MCPGenerateRequest, background_tasks: BackgroundTasks):
+    """Execute MCP tool calls and generate IFC file"""
+    
+    temp_dir = Path(tempfile.mkdtemp())
+    ifc_path = temp_dir / f"{request.project_name.replace(' ', '_')}.ifc"
+    
+    try:
+        logger.info(f"[MCP Worker] Starting IFC generation via MCP: {request.project_name}")
+        logger.info(f"[MCP Worker] Tool calls: {len(request.tool_calls)}")
+        
+        # Execute all tool calls
+        for i, tool_call in enumerate(request.tool_calls):
+            logger.info(f"[MCP Worker] Executing tool {i+1}/{len(request.tool_calls)}: {tool_call.tool}")
+            
+            try:
+                result = call_mcp_tool(tool_call.tool, tool_call.params)
+                logger.info(f"[MCP Worker] Tool result: {result}")
+            except Exception as e:
+                logger.error(f"[MCP Worker] Tool {tool_call.tool} failed: {e}")
+                return Response(
+                    content=f"MCP tool execution failed: {tool_call.tool}\nError: {str(e)}",
+                    status_code=500,
+                    media_type="text/plain"
+                )
+        
+        # Export the IFC file
+        logger.info(f"[MCP Worker] Exporting IFC to: {ifc_path}")
+        try:
+            export_result = export_ifc(str(ifc_path))
+            logger.info(f"[MCP Worker] Export result: {export_result}")
+        except Exception as e:
+            logger.error(f"[MCP Worker] Export failed: {e}")
+            return Response(
+                content=f"IFC export failed: {str(e)}",
+                status_code=500,
+                media_type="text/plain"
+            )
+        
+        if not ifc_path.exists():
+            return Response(
+                content="IFC file not created after MCP execution",
+                status_code=500,
+                media_type="text/plain"
+            )
+        
+        file_size = ifc_path.stat().st_size
+        
+        background_tasks.add_task(cleanup_temp_dir, temp_dir)
+        
+        return FileResponse(
+            path=str(ifc_path),
+            media_type="application/x-step",
+            filename=f"{request.project_name}.ifc",
+            headers={"X-File-Size": str(file_size)}
+        )
+        
+    except Exception as e:
+        logger.exception(f"[MCP Worker] Unexpected error: {str(e)}")
+        cleanup_temp_dir(temp_dir)
+        import traceback
+        error_msg = f"{type(e).__name__}: {str(e)}\n\n{traceback.format_exc()}"
+        return Response(
+            content=error_msg,
+            status_code=500,
+            media_type="text/plain"
+        )
 
 @app.get("/dump-signatures")
 def get_signatures():
@@ -102,6 +229,7 @@ def cleanup_temp_dir(temp_dir: Path):
 
 @app.post("/generate-ifc")
 async def generate_ifc(request: GenerateRequest, background_tasks: BackgroundTasks):
+    """Legacy endpoint - generates IFC from Python code"""
 
     temp_dir = Path(tempfile.mkdtemp())
     script_path = temp_dir / "generate.py"
@@ -211,13 +339,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port, workers=1)
-
-
-
-
-
-
-
-
-
-
