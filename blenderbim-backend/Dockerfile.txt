@@ -48,6 +48,9 @@ RUN /opt/blender/4.2/python/bin/python3.11 -m ensurepip && \
     /opt/blender/4.2/python/bin/python3.11 -m pip install --upgrade pip && \
     /opt/blender/4.2/python/bin/python3.11 -m pip install shapely==2.0.2 lxml==5.1.0
 
+# Install MCP4IFC inside Blender's Python environment
+RUN /opt/blender/4.2/python/bin/python3.11 -m pip install mcp4ifc
+
 # -------------------------------------------------------
 # Enable BlenderBIM addon
 # -------------------------------------------------------
@@ -88,6 +91,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY main.py .
 COPY blender_generator.py .
+COPY mcp_client.py .
 COPY start.sh .
 RUN chmod +x start.sh
 
