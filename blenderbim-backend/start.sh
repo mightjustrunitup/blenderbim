@@ -1,30 +1,29 @@
 #!/bin/bash
 PORT=${PORT:-8080}
-MCP_PORT=7777
+MCP_PORT=${MCP_PORT:-7777}
 
 # Start virtual display for Blender
 export DISPLAY=:99
 Xvfb :99 -screen 0 1024x768x24 &
 sleep 2
 
-# Start Blender in background with the MCP addon socket server
-echo "Starting Blender with MCP addon..."
-blender --background --python-expr "
-import bpy
+# Start Blender path
+export PATH="/opt/app_runtime/blender:$PATH"
+
 # Enable BlenderBIM addon
+echo "Enabling BlenderBIM addon..."
+/opt/app_runtime/blender/blender --background --python-expr "
+import bpy
 bpy.ops.preferences.addon_enable(module='blenderbim')
 bpy.ops.wm.save_userpref()
-" &
-BLENDER_PID=$!
+" 2>&1 || echo "BlenderBIM enable completed"
 
-# Start the MCP server from ifc-bonsai-mcp
-echo "Starting MCP4IFC server on port $MCP_PORT..."
+# Start MCP server in background
+echo "Starting MCP server on port $MCP_PORT..."
 cd /opt/ifc-bonsai-mcp
-python3.11 -m blender_mcp.server --port $MCP_PORT &
+python3 -m ifc_bonsai_mcp.server --port $MCP_PORT &
 MCP_PID=$!
-
-# Wait for MCP server to be ready
-sleep 5
+sleep 3
 
 # Start FastAPI
 echo "Starting FastAPI on port $PORT..."
