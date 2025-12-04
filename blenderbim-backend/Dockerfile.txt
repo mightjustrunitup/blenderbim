@@ -61,6 +61,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy built Blender + MCP + addons from builder
 COPY --from=builder /opt/app_runtime /opt/app_runtime
+COPY --from=builder /opt/ifc-bonsai-mcp /opt/app_runtime/ifc-bonsai-mcp
 
 # Setup Blender config directory with addons
 RUN mkdir -p /root/.config/blender/4.4/scripts && \
@@ -72,6 +73,12 @@ RUN ln -s /opt/app_runtime/blender/blender /usr/local/bin/blender
 
 # Copy and install your application
 COPY requirements.txt ./
+
+# Install local MCP package copied from the builder stage so pip doesn't
+# need to git-clone at runtime. This ensures `ifc_bonsai_mcp` module is
+# available to `python3 -m ifc_bonsai_mcp.server`.
+RUN pip3 install --no-cache-dir /opt/app_runtime/ifc-bonsai-mcp || true
+
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY main.py blender_generator.py mcp_client.py start.sh ./
