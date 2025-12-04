@@ -43,7 +43,6 @@ RUN /opt/blender/4.4/python/bin/python3.11 -m pip install websockets trimesh num
 # Prepare runtime folder for final image
 RUN mkdir -p /opt/app_runtime
 RUN cp -r /opt/blender /opt/app_runtime/blender
-RUN cp -r /opt/ifc-bonsai-mcp /opt/app_runtime/ifc-bonsai-mcp
 RUN cp -r /opt/blender_addons /opt/app_runtime/blender_addons
 
 # -----------------------------
@@ -70,9 +69,6 @@ RUN mkdir -p /root/.config/blender/4.4/scripts && \
 # Add Blender to PATH
 ENV PATH="/opt/app_runtime/blender:${PATH}"
 RUN ln -s /opt/app_runtime/blender/blender /usr/local/bin/blender
-
-# Install MCP server in runtime
-RUN pip3 install /opt/app_runtime/ifc-bonsai-mcp
 
 # Copy and install your application
 COPY requirements.txt ./
