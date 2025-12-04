@@ -31,11 +31,12 @@ RUN wget -q https://download.blender.org/release/Blender4.4/blender-4.4.0-linux-
     rm blender-4.4.0-linux-x64.tar.xz && \
     ln -s /opt/blender/blender /usr/local/bin/blender
 
-# Install Bonsai Add-on (successor to BlenderBIM)
-RUN wget -q https://extensions.blender.org/api/v1/extensions/bonsai/versions/0.8.3/file/ -O bonsai.zip && \
-    mkdir -p /root/.config/blender/4.4/extensions/blender_org && \
-    unzip -q bonsai.zip -d /root/.config/blender/4.4/extensions/blender_org/bonsai && \
-    rm bonsai.zip
+# Install BlenderBIM Add-on from GitHub releases
+RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240602/blenderbim-240602-py311-linux.zip \
+    -O /root/blenderbim.zip && \
+    mkdir -p /root/.config/blender/4.4/scripts/addons && \
+    unzip -q /root/blenderbim.zip -d /root/.config/blender/4.4/scripts/addons/ && \
+    rm /root/blenderbim.zip
 
 # Fix Shapely & LXML inside Blender's Python environment
 RUN /opt/blender/4.4/python/bin/python3.11 -m ensurepip && \
@@ -78,3 +79,4 @@ RUN chmod +x start.sh
 # Expose port and set entrypoint
 EXPOSE ${PORT}
 CMD ["./start.sh"]
+
