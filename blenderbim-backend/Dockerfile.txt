@@ -1,83 +1,83 @@
+# -----------------------------
+# Stage 1: Builder — build Blender, addons, MCP server
+# -----------------------------
 FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /build
 
-# System dependencies for building
+# System dependencies
 RUN apt-get update && apt-get install -y \
-    wget \
-    unzip \
-    bzip2 \
-    git \
-    python3.11 \
-    python3.11-venv \
-    python3-pip \
+    wget unzip bzip2 git libfreetype6 libgl1-mesa-glx libglu1-mesa \
+    libxi6 libxrender1 libgomp1 libgeos-dev xvfb libxkbcommon0 \
+    python3.11 python3.11-venv python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install UV package manager
-RUN pip3 install uv
+# Install Blender
+RUN wget -q https://download.blender.org/release/Blender4.4/blender-4.4.0-linux-x64.tar.xz \
+    && tar -xf blender-4.4.0-linux-x64.tar.xz \
+    && mv blender-4.4.0-linux-x64 /opt/blender \
+    && ln -s /opt/blender/blender /usr/local/bin/blender
 
-# Clone ifc-bonsai-mcp
-RUN git clone --depth 1 https://github.com/Show2Instruct/ifc-bonsai-mcp.git /opt/ifc-bonsai-mcp
+# Install BlenderBIM / Bonsai
+RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240602/blenderbim-240602-py311-linux.zip \
+    -O /root/blenderbim.zip \
+    && mkdir -p /root/.config/blender/4.4/scripts/addons \
+    && unzip -q /root/blenderbim.zip -d /root/.config/blender/4.4/scripts/addons/ \
+    && rm /root/blenderbim.zip
 
+# Fix shapely & lxml inside blender's Python
+RUN /opt/blender/4.4/python/bin/python3.11 -m ensurepip \
+    && /opt/blender/4.4/python/bin/python3.11 -m pip install --upgrade pip \
+    && /opt/blender/4.4/python/bin/python3.11 -m pip install shapely==2.0.2 lxml==5.1.0
+
+# Clone and install MCP server (ifc-bonsai-mcp or MCP4IFC)
+RUN git clone https://github.com/Show2Instruct/ifc-bonsai-mcp.git /opt/ifc-bonsai-mcp
 WORKDIR /opt/ifc-bonsai-mcp
-RUN uv sync || pip3 install -e .
+RUN pip3 install -e .  # adjust if server uses special install
+# (Install other libs for server)
+RUN /opt/blender/4.4/python/bin/python3.11 -m pip install websockets trimesh numpy
 
-# ============= RUNTIME STAGE =============
-FROM ubuntu:22.04
+# Copy the built environment somewhere
+RUN mkdir /opt/app_runtime
+
+# Copy blender and addons, MCP server, any needed libs
+RUN cp -r /opt/blender /opt/app_runtime/blender
+RUN cp -r /opt/ifc-bonsai-mcp /opt/app_runtime/mcp4ifc
+
+# You may also copy site-packages from blender's python or pip packages if needed
+
+# -----------------------------
+# Stage 2: Runtime — minimal / final image
+# -----------------------------
+FROM ubuntu:22.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
-
 WORKDIR /app
 
-# Minimal runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    unzip \
-    libfreetype6 \
-    libgl1-mesa-glx \
-    libglu1-mesa \
-    libxi6 \
-    libxrender1 \
-    libgomp1 \
-    libgeos-dev \
-    python3.11 \
-    python3-pip \
-    xvfb \
-    libxkbcommon0 \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libfreetype6 libgl1-mesa-glx libglu1-mesa libxi6 libxrender1 \
+    libgomp1 libgeos-dev xvfb libxkbcommon0 python3.11 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Blender 4.4
-RUN wget -q https://download.blender.org/release/Blender4.4/blender-4.4.0-linux-x64.tar.xz && \
-    tar -xf blender-4.4.0-linux-x64.tar.xz && \
-    mv blender-4.4.0-linux-x64 /opt/blender && \
-    rm blender-4.4.0-linux-x64.tar.xz && \
-    ln -s /opt/blender/blender /usr/local/bin/blender
+# Copy built Blender + MCP + addons from builder
+COPY --from=builder /opt/app_runtime /opt/app_runtime
 
-# Install BlenderBIM Add-on
-RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240602/blenderbim-240602-py311-linux.zip \
-    -O /tmp/blenderbim.zip && \
-    mkdir -p /root/.config/blender/4.4/scripts/addons && \
-    unzip -q /tmp/blenderbim.zip -d /root/.config/blender/4.4/scripts/addons/ && \
-    rm /tmp/blenderbim.zip
+# Add Blender to PATH (or use full path)
+ENV PATH="/opt/app_runtime/blender/blender:${PATH}"
 
-# Fix Shapely & LXML inside Blender's Python
-RUN /opt/blender/4.4/python/bin/python3.11 -m ensurepip && \
-    /opt/blender/4.4/python/bin/python3.11 -m pip install --no-cache-dir shapely==2.0.2 lxml==5.1.0 websockets trimesh numpy
-
-# Copy MCP server from builder
-COPY --from=builder /opt/ifc-bonsai-mcp /opt/ifc-bonsai-mcp
-
-# Install Python dependencies
-COPY requirements.txt .
+# Copy your app code
+COPY requirements.txt ./
 RUN pip3 install --no-cache-dir -r requirements.txt
-
-# Copy application files
 COPY main.py blender_generator.py mcp_client.py start.sh ./
 RUN chmod +x start.sh
 
+# Expose port
 EXPOSE ${PORT}
+
+# Start script (should start MCP server + your FastAPI)
 CMD ["./start.sh"]
+
 
 
