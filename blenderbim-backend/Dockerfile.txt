@@ -56,7 +56,7 @@ WORKDIR /app
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
     libfreetype6 libgl1-mesa-glx libglu1-mesa libxi6 libxrender1 \
-    libgomp1 libgeos-dev xvfb libxkbcommon0 python3.11 python3-pip \
+    libgomp1 libgeos-dev xvfb libxkbcommon0 python3.11 python3.11-venv python3.11-distutils \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy built Blender + MCP + addons from builder
@@ -74,12 +74,16 @@ RUN ln -s /opt/app_runtime/blender/blender /usr/local/bin/blender
 # Copy and install your application
 COPY requirements.txt ./
 
-# Install local MCP package copied from the builder stage so pip doesn't
-# need to git-clone at runtime. This ensures `ifc_bonsai_mcp` module is
-# available to `python3 -m ifc_bonsai_mcp.server`.
-RUN pip3 install --no-cache-dir /opt/app_runtime/ifc-bonsai-mcp || true
+# Make sure Python 3.11 has pip & modern packaging tools, then install
+# the local MCP package and the app requirements using Python 3.11's pip
+RUN python3.11 -m ensurepip || true
+RUN python3.11 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Install the MCP package copied from the builder stage (may fail
+# if already installed; allow failure to not break builds)
+RUN python3.11 -m pip install --no-cache-dir /opt/app_runtime/ifc-bonsai-mcp || true
+
+RUN python3.11 -m pip install --no-cache-dir -r requirements.txt
 
 COPY main.py blender_generator.py mcp_client.py start.sh ./
 RUN chmod +x start.sh
