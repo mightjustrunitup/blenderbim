@@ -40,6 +40,11 @@ class MCPGenerateRequest(BaseModel):
     tool_calls: List[ToolCall]
     project_name: str = "Generated Model"
 
+@app.get("/")
+async def root():
+    """Root endpoint for health check"""
+    return {"service": "BlenderBIM MCP Worker", "version": "4.0.0", "status": "running"}
+
 @app.get("/health")
 async def health():
     """Health check endpoint"""
