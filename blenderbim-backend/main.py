@@ -49,8 +49,16 @@ async def root():
 async def get_tools_simple():
     """Simple /tools endpoint to view all available MCP4IFC tools"""
     try:
-        tools = await mcp_get_tools_for_llm()
-        return {"tools": tools, "count": len(tools)}
+        tools = get_mcp_tools()
+        # Format for easy reading
+        tool_list = []
+        for tool in tools.get("tools", tools if isinstance(tools, list) else []):
+            tool_list.append({
+                "name": tool.get("name"),
+                "description": tool.get("description"),
+                "parameters": tool.get("inputSchema", tool.get("input_schema", {}))
+            })
+        return {"tools": tool_list, "count": len(tool_list)}
     except Exception as e:
         return {"error": str(e), "message": "MCP server may not be running"}
 
@@ -353,3 +361,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port, workers=1)
+
