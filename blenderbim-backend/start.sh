@@ -20,10 +20,15 @@ bpy.ops.wm.save_userpref()
 
 # Start MCP server in background
 echo "Starting MCP server on port $MCP_PORT..."
-cd /opt/app_runtime/ifc-bonsai-mcp
-python3 -m ifc_bonsai_mcp.server --port $MCP_PORT &
+python3 -m ifc_bonsai_mcp.server --port $MCP_PORT > /tmp/mcp_server.log 2>&1 &
 MCP_PID=$!
 sleep 3
+
+# Check if MCP server started
+if ! ps -p $MCP_PID > /dev/null; then
+    echo "MCP server failed to start. Check logs:"
+    cat /tmp/mcp_server.log
+fi
 
 # Start FastAPI
 echo "Starting FastAPI on port $PORT..."
