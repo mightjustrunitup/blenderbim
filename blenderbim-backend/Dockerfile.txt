@@ -1,15 +1,38 @@
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System dependencies for building
+RUN apt-get update && apt-get install -y \
+    wget \
+    unzip \
+    bzip2 \
+    git \
+    python3.11 \
+    python3.11-venv \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install UV package manager
+RUN pip3 install uv
+
+# Clone ifc-bonsai-mcp
+RUN git clone --depth 1 https://github.com/Show2Instruct/ifc-bonsai-mcp.git /opt/ifc-bonsai-mcp
+
+WORKDIR /opt/ifc-bonsai-mcp
+RUN uv sync || pip3 install -e .
+
+# ============= RUNTIME STAGE =============
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-# System dependencies
-RUN apt-get update && apt-get install -y \
+# Minimal runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     unzip \
-    bzip2 \
-    git \
     libfreetype6 \
     libgl1-mesa-glx \
     libglu1-mesa \
@@ -18,65 +41,43 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     libgeos-dev \
     python3.11 \
-    python3.11-venv \
     python3-pip \
     xvfb \
     libxkbcommon0 \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Install Blender 4.4 (required for Bonsai 0.8.2+)
+# Install Blender 4.4
 RUN wget -q https://download.blender.org/release/Blender4.4/blender-4.4.0-linux-x64.tar.xz && \
     tar -xf blender-4.4.0-linux-x64.tar.xz && \
     mv blender-4.4.0-linux-x64 /opt/blender && \
     rm blender-4.4.0-linux-x64.tar.xz && \
     ln -s /opt/blender/blender /usr/local/bin/blender
 
-# Install BlenderBIM Add-on from GitHub releases
+# Install BlenderBIM Add-on
 RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240602/blenderbim-240602-py311-linux.zip \
-    -O /root/blenderbim.zip && \
+    -O /tmp/blenderbim.zip && \
     mkdir -p /root/.config/blender/4.4/scripts/addons && \
-    unzip -q /root/blenderbim.zip -d /root/.config/blender/4.4/scripts/addons/ && \
-    rm /root/blenderbim.zip
+    unzip -q /tmp/blenderbim.zip -d /root/.config/blender/4.4/scripts/addons/ && \
+    rm /tmp/blenderbim.zip
 
-# Fix Shapely & LXML inside Blender's Python environment
+# Fix Shapely & LXML inside Blender's Python
 RUN /opt/blender/4.4/python/bin/python3.11 -m ensurepip && \
-    /opt/blender/4.4/python/bin/python3.11 -m pip install --upgrade pip && \
-    /opt/blender/4.4/python/bin/python3.11 -m pip install shapely==2.0.2 lxml==5.1.0
+    /opt/blender/4.4/python/bin/python3.11 -m pip install --no-cache-dir shapely==2.0.2 lxml==5.1.0 websockets trimesh numpy
 
-# Install UV package manager
-RUN pip3 install uv
+# Copy MCP server from builder
+COPY --from=builder /opt/ifc-bonsai-mcp /opt/ifc-bonsai-mcp
 
-# Clone ifc-bonsai-mcp (MCP4IFC) from source
-RUN git clone https://github.com/Show2Instruct/ifc-bonsai-mcp.git /opt/ifc-bonsai-mcp
-
-# Install MCP server dependencies
-WORKDIR /opt/ifc-bonsai-mcp
-RUN uv sync || pip3 install -e .
-
-# Install required packages in Blender's Python for the addon
-RUN /opt/blender/4.4/python/bin/python3.11 -m pip install \
-    websockets \
-    trimesh \
-    numpy
-
-# Install Blender addon packages
-RUN python3.11 scripts/install_blender_packages.py || true
-
-WORKDIR /app
-
-# Install Python dependencies for your application
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copy application files
-COPY main.py .
-COPY blender_generator.py .
-COPY mcp_client.py .
-COPY start.sh .
-
+COPY main.py blender_generator.py mcp_client.py start.sh ./
 RUN chmod +x start.sh
 
-# Expose port and set entrypoint
 EXPOSE ${PORT}
 CMD ["./start.sh"]
+
 
