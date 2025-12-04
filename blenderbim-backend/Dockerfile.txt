@@ -4,13 +4,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-# -------------------------------------------------------
 # System dependencies
-# -------------------------------------------------------
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \
     bzip2 \
+    git \
     libfreetype6 \
     libgl1-mesa-glx \
     libglu1-mesa \
@@ -19,84 +18,63 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     libgeos-dev \
     python3.11 \
+    python3.11-venv \
     python3-pip \
     xvfb \
     libxkbcommon0 \
     && rm -rf /var/lib/apt/lists/*
 
-# -------------------------------------------------------
-# Install Blender 4.2.0
-# -------------------------------------------------------
-RUN wget -q https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz && \
-    tar -xf blender-4.2.0-linux-x64.tar.xz && \
-    mv blender-4.2.0-linux-x64 /opt/blender && \
-    rm blender-4.2.0-linux-x64.tar.xz && \
+# Install Blender 4.4 (required for Bonsai 0.8.2+)
+RUN wget -q https://download.blender.org/release/Blender4.4/blender-4.4.0-linux-x64.tar.xz && \
+    tar -xf blender-4.4.0-linux-x64.tar.xz && \
+    mv blender-4.4.0-linux-x64 /opt/blender && \
+    rm blender-4.4.0-linux-x64.tar.xz && \
     ln -s /opt/blender/blender /usr/local/bin/blender
 
-# -------------------------------------------------------
-# Install BlenderBIM (blenderbim-240602, Python 3.11)
-# -------------------------------------------------------
-RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240602/blenderbim-240602-py311-linux.zip && \
-    mkdir -p /root/.config/blender/4.2/scripts/addons && \
-    unzip -q blenderbim-240602-py311-linux.zip -d /root/.config/blender/4.2/scripts/addons/ && \
-    rm blenderbim-240602-py311-linux.zip
+# Install Bonsai Add-on (successor to BlenderBIM)
+RUN wget -q https://extensions.blender.org/api/v1/extensions/bonsai/versions/0.8.3/file/ -O bonsai.zip && \
+    mkdir -p /root/.config/blender/4.4/extensions/blender_org && \
+    unzip -q bonsai.zip -d /root/.config/blender/4.4/extensions/blender_org/bonsai && \
+    rm bonsai.zip
 
-# -------------------------------------------------------
-# Fix Shapely & LXML inside Blender’s Python environment
-# -------------------------------------------------------
-RUN /opt/blender/4.2/python/bin/python3.11 -m ensurepip && \
-    /opt/blender/4.2/python/bin/python3.11 -m pip install --upgrade pip && \
-    /opt/blender/4.2/python/bin/python3.11 -m pip install shapely==2.0.2 lxml==5.1.0
+# Fix Shapely & LXML inside Blender's Python environment
+RUN /opt/blender/4.4/python/bin/python3.11 -m ensurepip && \
+    /opt/blender/4.4/python/bin/python3.11 -m pip install --upgrade pip && \
+    /opt/blender/4.4/python/bin/python3.11 -m pip install shapely==2.0.2 lxml==5.1.0
 
-# Install MCP4IFC inside Blender's Python environment
-RUN /opt/blender/4.2/python/bin/python3.11 -m pip install mcp4ifc
+# Install UV package manager
+RUN pip3 install uv
 
-# -------------------------------------------------------
-# Enable BlenderBIM addon
-# -------------------------------------------------------
-RUN blender --background --python-expr \
-    "import bpy; bpy.ops.preferences.addon_enable(module='blenderbim'); bpy.ops.wm.save_userpref()"
+# Clone ifc-bonsai-mcp (MCP4IFC) from source
+RUN git clone https://github.com/Show2Instruct/ifc-bonsai-mcp.git /opt/ifc-bonsai-mcp
 
-# -------------------------------------------------------
-# CREATE API SIGNATURE DUMP SCRIPT
-# -------------------------------------------------------
-RUN echo "\
-import pkgutil, inspect, json\n\
-import ifcopenshell.api\n\
-signatures = {}\n\
-for m in pkgutil.walk_packages(ifcopenshell.api.__path__, prefix='ifcopenshell.api.'):\n\
-    try:\n\
-        module = __import__(m.name, fromlist=[''])\n\
-    except ImportError:\n\
-        continue\n\
-    for name, obj in inspect.getmembers(module, inspect.isfunction):\n\
-        try:\n\
-            sig = str(inspect.signature(obj))\n\
-        except (ValueError, TypeError):\n\
-            sig = '()'\n\
-        signatures[f\"{m.name}.{name}\"] = sig\n\
-with open('/app/api_signatures.json', 'w') as f:\n\
-    json.dump(signatures, f, indent=2)\n" > /app/dump_signatures.py
+# Install MCP server dependencies
+WORKDIR /opt/ifc-bonsai-mcp
+RUN uv sync || pip3 install -e .
 
-# -------------------------------------------------------
-# RUN SIGNATURE DUMP SCRIPT INSIDE BLENDER
-# -------------------------------------------------------
-RUN blender --background --python /app/dump_signatures.py
+# Install required packages in Blender's Python for the addon
+RUN /opt/blender/4.4/python/bin/python3.11 -m pip install \
+    websockets \
+    trimesh \
+    numpy
 
-# -------------------------------------------------------
-# COPY and INSTALL application dependencies
-# -------------------------------------------------------
+# Install Blender addon packages
+RUN python3.11 scripts/install_blender_packages.py || true
+
+WORKDIR /app
+
+# Install Python dependencies for your application
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# Copy application files
 COPY main.py .
 COPY blender_generator.py .
 COPY mcp_client.py .
 COPY start.sh .
+
 RUN chmod +x start.sh
 
+# Expose port and set entrypoint
 EXPOSE ${PORT}
 CMD ["./start.sh"]
-
-
-
