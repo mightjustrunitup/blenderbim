@@ -20,7 +20,7 @@ bpy.ops.wm.save_userpref()
 
 # Start MCP server in background
 echo "Starting MCP server on port $MCP_PORT..."
-cd /opt/ifc-bonsai-mcp
+cd /opt/app_runtime/ifc-bonsai-mcp
 python3 -m ifc_bonsai_mcp.server --port $MCP_PORT &
 MCP_PID=$!
 sleep 3
