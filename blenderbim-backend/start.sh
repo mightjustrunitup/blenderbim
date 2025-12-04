@@ -11,8 +11,8 @@ sleep 2
 echo "Starting Blender with MCP addon..."
 blender --background --python-expr "
 import bpy
-# Enable Bonsai addon
-bpy.ops.preferences.addon_enable(module='bonsai')
+# Enable BlenderBIM addon
+bpy.ops.preferences.addon_enable(module='blenderbim')
 bpy.ops.wm.save_userpref()
 " &
 BLENDER_PID=$!
