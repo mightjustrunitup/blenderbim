@@ -45,6 +45,15 @@ async def root():
     """Root endpoint for health check"""
     return {"service": "BlenderBIM MCP Worker", "version": "4.0.0", "status": "running"}
 
+@app.get("/tools")
+async def get_tools_simple():
+    """Simple /tools endpoint to view all available MCP4IFC tools"""
+    try:
+        tools = await mcp_get_tools_for_llm()
+        return {"tools": tools, "count": len(tools)}
+    except Exception as e:
+        return {"error": str(e), "message": "MCP server may not be running"}
+
 @app.get("/health")
 async def health():
     """Health check endpoint"""
