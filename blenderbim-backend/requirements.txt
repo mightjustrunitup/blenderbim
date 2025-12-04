@@ -5,3 +5,4 @@ python-multipart==0.0.12
 shapely==2.0.2
 requests>=2.31.0
 websockets>=12.0
+ifc-bonsai-mcp @ git+https://github.com/Show2Instruct/ifc-bonsai-mcp.git
