@@ -20,14 +20,38 @@ bpy.ops.wm.save_userpref()
 
 # Start MCP server in background
 echo "Starting MCP server on port $MCP_PORT..."
-python3 -m ifc_bonsai_mcp.server --port $MCP_PORT > /tmp/mcp_server.log 2>&1 &
+export PYTHONPATH="/opt/app_runtime/ifc-bonsai-mcp:${PYTHONPATH}"
+echo "PYTHONPATH=$PYTHONPATH" > /tmp/mcp_server.log
+echo "--- sys.path ---" >> /tmp/mcp_server.log
+python3 -c "import sys; print('\n'.join(sys.path))" >> /tmp/mcp_server.log 2>&1
+echo "--- find_spec(ifc_bonsai_mcp) ---" >> /tmp/mcp_server.log
+python3 - <<'PY' >> /tmp/mcp_server.log 2>&1
+import importlib.util
+print(importlib.util.find_spec('ifc_bonsai_mcp'))
+PY
+
+echo "Attempting to start MCP server (module)..." >> /tmp/mcp_server.log
+python3 -m ifc_bonsai_mcp.server --port $MCP_PORT >> /tmp/mcp_server.log 2>&1 &
 MCP_PID=$!
 sleep 3
 
-# Check if MCP server started
+# If module start failed, dump logs for debugging
 if ! ps -p $MCP_PID > /dev/null; then
     echo "MCP server failed to start. Check logs:"
     cat /tmp/mcp_server.log
+    # Try running server directly from source as a fallback
+    if [ -f "/opt/app_runtime/ifc-bonsai-mcp/server.py" ]; then
+        echo "Attempting fallback: running /opt/app_runtime/ifc-bonsai-mcp/server.py" >> /tmp/mcp_server.log
+        python3 /opt/app_runtime/ifc-bonsai-mcp/server.py --port $MCP_PORT >> /tmp/mcp_server.log 2>&1 &
+        MCP_PID=$!
+        sleep 2
+        if ! ps -p $MCP_PID > /dev/null; then
+            echo "Fallback also failed. Dumping logs:";
+            cat /tmp/mcp_server.log
+        else
+            echo "Fallback MCP server started with PID $MCP_PID"
+        fi
+    fi
 fi
 
 # Start FastAPI
