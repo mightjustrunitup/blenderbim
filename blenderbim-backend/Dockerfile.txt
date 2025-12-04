@@ -22,8 +22,8 @@ RUN wget -q https://download.blender.org/release/Blender4.4/blender-4.4.0-linux-
 # Install BlenderBIM / Bonsai add-on
 RUN wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240602/blenderbim-240602-py311-linux.zip \
     -O /root/blenderbim.zip \
-    && mkdir -p /root/.config/blender/4.4/scripts/addons \
-    && unzip -q /root/blenderbim.zip -d /root/.config/blender/4.4/scripts/addons/ \
+    && mkdir -p /opt/blender_addons/scripts/addons \
+    && unzip -q /root/blenderbim.zip -d /opt/blender_addons/scripts/addons/ \
     && rm /root/blenderbim.zip
 
 # Fix shapely & lxml inside Blender's Python
@@ -43,7 +43,8 @@ RUN /opt/blender/4.4/python/bin/python3.11 -m pip install websockets trimesh num
 # Prepare runtime folder for final image
 RUN mkdir -p /opt/app_runtime
 RUN cp -r /opt/blender /opt/app_runtime/blender
-RUN cp -r /opt/ifc-bonsai-mcp /opt/app_runtime/mcp4ifc
+RUN cp -r /opt/ifc-bonsai-mcp /opt/app_runtime/ifc-bonsai-mcp
+RUN cp -r /opt/blender_addons /opt/app_runtime/blender_addons
 
 # -----------------------------
 # Stage 2: Runtime — minimal / final image
@@ -62,8 +63,16 @@ RUN apt-get update && apt-get install -y \
 # Copy built Blender + MCP + addons from builder
 COPY --from=builder /opt/app_runtime /opt/app_runtime
 
-# Add Blender to PATH (or call via full path /opt/app_runtime/blender/blender)
-ENV PATH="/opt/app_runtime/blender/blender:${PATH}"
+# Setup Blender config directory with addons
+RUN mkdir -p /root/.config/blender/4.4/scripts && \
+    ln -s /opt/app_runtime/blender_addons/scripts/addons /root/.config/blender/4.4/scripts/addons
+
+# Add Blender to PATH
+ENV PATH="/opt/app_runtime/blender:${PATH}"
+RUN ln -s /opt/app_runtime/blender/blender /usr/local/bin/blender
+
+# Install MCP server in runtime
+RUN pip3 install /opt/app_runtime/ifc-bonsai-mcp
 
 # Copy and install your application
 COPY requirements.txt ./
@@ -74,3 +83,4 @@ RUN chmod +x start.sh
 
 EXPOSE ${PORT}
 CMD ["./start.sh"]
+
