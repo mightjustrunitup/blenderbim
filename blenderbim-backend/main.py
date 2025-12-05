@@ -9,12 +9,60 @@ from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
-
-from mcp_client import call_mcp_tool, get_mcp_tools, execute_tool_calls, export_ifc
+import requests
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# MCP Server configuration
+MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:7777")
+
+def call_mcp_tool(tool_name: str, params: dict):
+    """Call an MCP tool via HTTP to the external MCP server"""
+    try:
+        response = requests.post(
+            f"{MCP_SERVER_URL}/call",
+            json={"tool": tool_name, "params": params},
+            timeout=60
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.error(f"MCP tool call failed: {e}")
+        raise
+
+def get_mcp_tools():
+    """Get available tools from external MCP server"""
+    try:
+        response = requests.get(f"{MCP_SERVER_URL}/tools/list", timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.error(f"Failed to fetch MCP tools: {e}")
+        raise
+
+def execute_tool_calls(tool_calls: List[dict]):
+    """Execute multiple MCP tool calls"""
+    results = []
+    for call in tool_calls:
+        result = call_mcp_tool(call["tool"], call.get("params", {}))
+        results.append(result)
+    return results
+
+def export_ifc(output_path: str):
+    """Export IFC file via MCP server"""
+    try:
+        response = requests.post(
+            f"{MCP_SERVER_URL}/call",
+            json={"tool": "export_ifc", "params": {"output_path": output_path}},
+            timeout=60
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.error(f"IFC export failed: {e}")
+        raise
 
 app = FastAPI(title="BlenderBIM Worker", version="4.0.0")
 
@@ -361,4 +409,6 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port, workers=1)
+
+
 
