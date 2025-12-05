@@ -55,9 +55,10 @@ if ! ps -p $MCP_PID > /dev/null; then
     echo "MCP server failed to start. Check logs:"
     cat /tmp/mcp_server.log
     # Try running server directly from source as a fallback
-    if [ -f "/opt/app_runtime/ifc-bonsai-mcp/server.py" ]; then
-        echo "Attempting fallback: running /opt/app_runtime/ifc-bonsai-mcp/server.py" >> /tmp/mcp_server.log
-        python3.11 /opt/app_runtime/ifc-bonsai-mcp/server.py --port $MCP_PORT >> /tmp/mcp_server.log 2>&1 &
+    # Fallback: try running the server script from the package 'src' dir
+    if [ -f "/opt/app_runtime/ifc-bonsai-mcp/src/blender_mcp/server.py" ]; then
+        echo "Attempting fallback: running /opt/app_runtime/ifc-bonsai-mcp/src/blender_mcp/server.py" >> /tmp/mcp_server.log
+        python3.11 /opt/app_runtime/ifc-bonsai-mcp/src/blender_mcp/server.py --port $MCP_PORT >> /tmp/mcp_server.log 2>&1 &
         MCP_PID=$!
         sleep 2
         if ! ps -p $MCP_PID > /dev/null; then
@@ -69,8 +70,26 @@ if ! ps -p $MCP_PID > /dev/null; then
     fi
 fi
 
+# Print key diagnostics to stdout so Railway logs show them immediately
+echo "----- MCP DIAGNOSTICS (BEGIN) -----"
+echo "PYTHONPATH: $PYTHONPATH"
+echo "--- /opt/app_runtime/ifc-bonsai-mcp (top-level) ---"
+ls -la /opt/app_runtime/ifc-bonsai-mcp || true
+echo "--- /opt/app_runtime/ifc-bonsai-mcp/src ---"
+ls -la /opt/app_runtime/ifc-bonsai-mcp/src || true
+echo "--- importlib find_spec for blender_mcp ---"
+python3.11 - <<'PY' || true
+import importlib.util
+print(importlib.util.find_spec('blender_mcp'))
+try:
+    import blender_mcp
+    print('blender_mcp.__file__ =', getattr(blender_mcp, '__file__', None))
+except Exception as e:
+    print('blender_mcp import error:', e)
+PY
+echo "----- MCP DIAGNOSTICS (END) -----"
+
 # Start FastAPI
 echo "Starting FastAPI on port $PORT..."
 cd /app
 exec python3.11 -m uvicorn main:app --host 0.0.0.0 --port $PORT
-
