@@ -1,28 +1,97 @@
-FROM python:3.11-slim
+# ============================================================================
+# Multi-stage build: Blender (download pre-built) + FastAPI server
+# MCP server runs in separate service
+# ============================================================================
+
+# Stage 1: Download Blender binary
+FROM ubuntu:22.04 as blender-downloader
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+WORKDIR /tmp
+RUN wget -q https://mirror.clarkson.edu/blender/release/Blender4.4/blender-4.4.0-linux-x64.tar.xz && \
+    tar -xf blender-4.4.0-linux-x64.tar.xz && \
+    rm blender-4.4.0-linux-x64.tar.xz
+
+# Stage 2: Runtime — FastAPI app with Blender (MCP server runs separately on different service)
+FROM ubuntu:22.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
-# Minimal system dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    git curl \
-    && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
+    python3 \
+    python3-pip \
+    python3-dev \
+    xvfb \
+    libxkbcommon-x11-0 \
+    libdbus-1-3 \
+    libfontconfig1 \
+    libx11-6 \
+    libxext6 \
+    libxrender1 \
+    libxkbcommon0 \
+    libgbm1 \
+    libgles2-mesa \
+    libgl1-mesa-glx \
+    libxi6 \
+    libgomp1 \
+    curl \
+    wget \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy local MCP source
-COPY ifc-bonsai-mcp-main /opt/ifc-bonsai-mcp
+# Copy Blender from builder stage
+COPY --from=blender-downloader /tmp/blender-4.4.0-linux-x64 /opt/blender
+ENV PATH="/opt/blender:$PATH"
+ENV BLENDER_EXECUTABLE="/opt/blender/blender"
 
-# Install MCP package + requirements
-COPY requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir /opt/ifc-bonsai-mcp && \
-    pip install --no-cache-dir -r requirements.txt
+# Download and install BlenderBIM addon
+RUN mkdir -p /opt/blender_addons/scripts/addons && \
+    wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240602/blenderbim-240602-py311-linux.zip \
+    -O /tmp/blenderbim.zip && \
+    unzip -q /tmp/blenderbim.zip -d /opt/blender_addons/scripts/addons/ && \
+    rm /tmp/blenderbim.zip
 
-# Copy app files
-COPY main.py mcp_client.py start.sh ./
+# Install Python dependencies for FastAPI
+WORKDIR /app
+RUN pip3 install --no-cache-dir \
+    fastapi \
+    uvicorn \
+    pydantic \
+    requests \
+    websockets
+
+# Copy application code (no mcp_client.py — MCP runs separately)
+COPY main.py .
+COPY execute_code.py .
+COPY blender_generator.py .
+COPY start.sh .
+COPY requirements.txt .
 RUN chmod +x start.sh
 
+# Install Python requirements
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip3 install --no-cache-dir -r requirements.txt
+
+# Setup Blender config directory with addons
+RUN mkdir -p /root/.config/blender/4.4/scripts && \
+    ln -s /opt/blender_addons/scripts/addons /root/.config/blender/4.4/scripts/addons
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV MCP_SERVER_URL="http://mcp-server:7777"
+ENV BLENDER_EXECUTABLE="/opt/blender/blender"
+
+# Expose port for FastAPI
 EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Run FastAPI server (MCP server runs in separate service)
 CMD ["./start.sh"]
+
 
 
 
