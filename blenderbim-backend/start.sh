@@ -22,6 +22,20 @@ bpy.ops.wm.save_userpref()
 echo "Starting MCP server on port $MCP_PORT..."
 export PYTHONPATH="/opt/app_runtime/ifc-bonsai-mcp/src:/opt/app_runtime/ifc-bonsai-mcp:${PYTHONPATH}"
 echo "PYTHONPATH=$PYTHONPATH" > /tmp/mcp_server.log
+
+# Diagnostics: show which python binaries exist and their versions
+echo "--- python binaries ---" >> /tmp/mcp_server.log
+which python3 >> /tmp/mcp_server.log 2>&1 || true
+which python3.11 >> /tmp/mcp_server.log 2>&1 || true
+python3 --version >> /tmp/mcp_server.log 2>&1 || true
+python3.11 --version >> /tmp/mcp_server.log 2>&1 || true
+
+# Diagnostics: list the MCP repo contents and pyproject to verify package layout
+echo "--- list /opt/app_runtime/ifc-bonsai-mcp ---" >> /tmp/mcp_server.log
+ls -la /opt/app_runtime/ifc-bonsai-mcp >> /tmp/mcp_server.log 2>&1 || true
+ls -la /opt/app_runtime/ifc-bonsai-mcp/src >> /tmp/mcp_server.log 2>&1 || true
+echo "--- cat pyproject.toml ---" >> /tmp/mcp_server.log
+cat /opt/app_runtime/ifc-bonsai-mcp/pyproject.toml >> /tmp/mcp_server.log 2>&1 || true
 echo "--- sys.path ---" >> /tmp/mcp_server.log
 python3.11 -c "import sys; print('\n'.join(sys.path))" >> /tmp/mcp_server.log 2>&1
 echo "--- find_spec(blender_mcp) ---" >> /tmp/mcp_server.log
@@ -59,3 +73,4 @@ fi
 echo "Starting FastAPI on port $PORT..."
 cd /app
 exec python3.11 -m uvicorn main:app --host 0.0.0.0 --port $PORT
+
