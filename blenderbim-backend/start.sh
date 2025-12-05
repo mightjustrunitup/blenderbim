@@ -20,18 +20,19 @@ bpy.ops.wm.save_userpref()
 
 # Start MCP server in background
 echo "Starting MCP server on port $MCP_PORT..."
-export PYTHONPATH="/opt/app_runtime/ifc-bonsai-mcp:${PYTHONPATH}"
+export PYTHONPATH="/opt/app_runtime/ifc-bonsai-mcp/src:/opt/app_runtime/ifc-bonsai-mcp:${PYTHONPATH}"
 echo "PYTHONPATH=$PYTHONPATH" > /tmp/mcp_server.log
 echo "--- sys.path ---" >> /tmp/mcp_server.log
 python3.11 -c "import sys; print('\n'.join(sys.path))" >> /tmp/mcp_server.log 2>&1
-echo "--- find_spec(ifc_bonsai_mcp) ---" >> /tmp/mcp_server.log
+echo "--- find_spec(blender_mcp) ---" >> /tmp/mcp_server.log
 python3.11 - <<'PY' >> /tmp/mcp_server.log 2>&1
 import importlib.util
-print(importlib.util.find_spec('ifc_bonsai_mcp'))
+print('blender_mcp:', importlib.util.find_spec('blender_mcp'))
+print('ifc_bonsai_mcp:', importlib.util.find_spec('ifc_bonsai_mcp'))
 PY
 
-echo "Attempting to start MCP server (module)..." >> /tmp/mcp_server.log
-python3.11 -m ifc_bonsai_mcp.server --port $MCP_PORT >> /tmp/mcp_server.log 2>&1 &
+echo "Attempting to start MCP server (module: blender_mcp)..." >> /tmp/mcp_server.log
+python3.11 -m blender_mcp.server --port $MCP_PORT >> /tmp/mcp_server.log 2>&1 &
 MCP_PID=$!
 sleep 3
 
