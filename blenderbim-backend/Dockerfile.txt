@@ -31,8 +31,8 @@ RUN /opt/blender/4.4/python/bin/python3.11 -m ensurepip \
     && /opt/blender/4.4/python/bin/python3.11 -m pip install --upgrade pip \
     && /opt/blender/4.4/python/bin/python3.11 -m pip install shapely==2.0.2 lxml==5.1.0
 
-# Clone and install MCP server (ifc-bonsai-mcp)
-RUN git clone https://github.com/Show2Instruct/ifc-bonsai-mcp.git /opt/ifc-bonsai-mcp
+# Copy local ifc-bonsai-mcp source into builder (included in repo as ifc-bonsai-mcp-main)
+COPY ifc-bonsai-mcp-main /opt/ifc-bonsai-mcp
 WORKDIR /opt/ifc-bonsai-mcp
 # Ensure packaging/build tools are available, then build a wheel for runtime install
 RUN python3.11 -m pip install --upgrade pip setuptools wheel build || true
@@ -77,20 +77,18 @@ RUN ln -s /opt/app_runtime/blender/blender /usr/local/bin/blender
 # Copy and install your application
 COPY requirements.txt ./
 
-# Make sure Python 3.11 has pip & modern packaging tools, then install
-# Some images may not include pip after ensurepip; bootstrap via get-pip.py if missing
-RUN python3.11 -m ensurepip --upgrade || true
-RUN python3.11 -m pip --version || (curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 -)
-RUN python3.11 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+# Use system pip3 (available from python3-pip apt package) for installs
+RUN pip3 install --upgrade pip setuptools wheel
+
+# Install the MCP wheel(s) produced in the builder stage
+RUN ls -la /opt/wheels || true
+RUN pip3 install --no-cache-dir /opt/wheels/*.whl || true
+
+# Install application requirements
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Make python3 point to python3.11 so scripts using `python3` use the same interpreter
 RUN if [ -x /usr/bin/python3.11 ]; then update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 || ln -sf /usr/bin/python3.11 /usr/bin/python3; fi
-
-# Install the MCP wheel(s) produced in the builder stage using runtime python3
-RUN ls -la /opt/wheels || true
-RUN python3 -m pip install --no-cache-dir /opt/wheels/*.whl || true
-
-RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
 COPY main.py blender_generator.py mcp_client.py start.sh ./
 RUN chmod +x start.sh
