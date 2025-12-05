@@ -34,8 +34,10 @@ RUN /opt/blender/4.4/python/bin/python3.11 -m ensurepip \
 # Clone and install MCP server (ifc-bonsai-mcp)
 RUN git clone https://github.com/Show2Instruct/ifc-bonsai-mcp.git /opt/ifc-bonsai-mcp
 WORKDIR /opt/ifc-bonsai-mcp
-# Normal install (not editable)
-RUN pip3 install .  
+# Ensure packaging/build tools are available, then build a wheel for runtime install
+RUN python3.11 -m pip install --upgrade pip setuptools wheel build || true
+RUN python3.11 -m pip wheel . -w /opt/wheels || true
+RUN python3.11 -m pip install . || true
 
 # Install libraries needed by MCP + Blender scripts
 RUN /opt/blender/4.4/python/bin/python3.11 -m pip install websockets trimesh numpy
@@ -62,6 +64,7 @@ RUN apt-get update && apt-get install -y \
 # Copy built Blender + MCP + addons from builder
 COPY --from=builder /opt/app_runtime /opt/app_runtime
 COPY --from=builder /opt/ifc-bonsai-mcp /opt/app_runtime/ifc-bonsai-mcp
+COPY --from=builder /opt/wheels /opt/wheels
 
 # Setup Blender config directory with addons
 RUN mkdir -p /root/.config/blender/4.4/scripts && \
@@ -81,10 +84,10 @@ RUN python3.11 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 # Make python3 point to python3.11 so scripts using `python3` use the same interpreter
 RUN if [ -x /usr/bin/python3.11 ]; then update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 || ln -sf /usr/bin/python3.11 /usr/bin/python3; fi
 
-# Install the MCP package copied from the builder stage using python3.11
+# Install the MCP package copied from the builder stage using the active python3
 # This ensures the package is installed into the interpreter that will run at runtime
-RUN python3.11 -m pip install --no-cache-dir /opt/app_runtime/ifc-bonsai-mcp
-RUN python3.11 -m pip install --no-cache-dir websockets httpx
+RUN ls -la /opt/wheels || true
+RUN python3 -m pip install --no-cache-dir /opt/wheels/*.whl || true
 
 RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
@@ -93,5 +96,3 @@ RUN chmod +x start.sh
 
 EXPOSE ${PORT}
 CMD ["./start.sh"]
-
-
