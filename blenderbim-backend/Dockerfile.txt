@@ -78,7 +78,9 @@ RUN ln -s /opt/app_runtime/blender/blender /usr/local/bin/blender
 COPY requirements.txt ./
 
 # Make sure Python 3.11 has pip & modern packaging tools, then install
-RUN python3.11 -m ensurepip || true
+# Some images may not include pip after ensurepip; bootstrap via get-pip.py if missing
+RUN python3.11 -m ensurepip --upgrade || true
+RUN python3.11 -m pip --version || (curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 -)
 RUN python3.11 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Make python3 point to python3.11 so scripts using `python3` use the same interpreter
