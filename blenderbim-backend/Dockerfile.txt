@@ -7,7 +7,7 @@
 FROM ubuntu:22.04 as blender-downloader
 RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
 WORKDIR /tmp
-RUN wget -q https://mirror.clarkson.edu/blender/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz && \
+RUN wget -q https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz && \
     tar -xf blender-4.2.0-linux-x64.tar.xz && \
     rm blender-4.2.0-linux-x64.tar.xz
 
@@ -91,9 +91,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Run FastAPI server (MCP server runs in separate service)
 CMD ["./start.sh"]
-
-
-
-
-
-
