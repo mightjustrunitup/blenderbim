@@ -10,16 +10,12 @@ sleep 2
 export PATH="/opt/blender:$PATH"
 export BLENDER_EXECUTABLE="/opt/blender/blender"
 
-# Enable BlenderBIM addon
-echo "Enabling BlenderBIM addon..."
-/opt/blender/blender --background --python-expr "
-import bpy
-bpy.ops.preferences.addon_enable(module='blenderbim')
-bpy.ops.wm.save_userpref()
-" 2>&1 || echo "BlenderBIM addon ready"
+# Note: BlenderBIM addon will be loaded by the socket server script when needed
+# Skipping addon enable at startup to avoid binary compatibility issues with shapely.lib
 
 # Start FastAPI server
 echo "Starting FastAPI on port $PORT..."
 echo "MCP_SERVER_URL: ${MCP_SERVER_URL}"
 cd /app
 exec python3 -m uvicorn main:app --host 0.0.0.0 --port $PORT
+
