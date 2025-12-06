@@ -46,12 +46,9 @@ COPY --from=blender-downloader /tmp/blender-4.2.0-linux-x64 /opt/blender
 ENV PATH="/opt/blender:$PATH"
 ENV BLENDER_EXECUTABLE="/opt/blender/blender"
 
-# Download and install BlenderBIM addon
-RUN mkdir -p /opt/blender_addons/scripts/addons && \
-    wget -q https://github.com/IfcOpenShell/IfcOpenShell/releases/download/blenderbim-240602/blenderbim-240602-py310-linux.zip \
-    -O /tmp/blenderbim.zip && \
-    unzip -q /tmp/blenderbim.zip -d /opt/blender_addons/scripts/addons/ && \
-    rm /tmp/blenderbim.zip
+# Note: BlenderBIM addon NOT needed on Railway
+# The addon runs on local Blender where actual IFC generation happens
+# Railway blenderbim-backend only acts as HTTP API to call external MCP server
 
 # Install Python dependencies for FastAPI
 WORKDIR /app
@@ -74,10 +71,6 @@ RUN chmod +x start.sh
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pip3 install --no-cache-dir -r requirements.txt
 
-# Setup Blender config directory with addons
-RUN mkdir -p /root/.config/blender/4.2/scripts && \
-    ln -s /opt/blender_addons/scripts/addons /root/.config/blender/4.2/scripts/addons
-
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV MCP_SERVER_URL="http://mcp-server:7777"
@@ -92,3 +85,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Run FastAPI server (MCP server runs in separate service)
 CMD ["./start.sh"]
+
