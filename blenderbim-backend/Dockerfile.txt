@@ -31,19 +31,16 @@ RUN /opt/blender/4.4/python/bin/python3.11 -m ensurepip \
     && /opt/blender/4.4/python/bin/python3.11 -m pip install --upgrade pip \
     && /opt/blender/4.4/python/bin/python3.11 -m pip install shapely==2.0.2 lxml==5.1.0
 
-# Clone and install MCP server (ifc-bonsai-mcp)
-RUN git clone https://github.com/Show2Instruct/ifc-bonsai-mcp.git /opt/ifc-bonsai-mcp
-WORKDIR /opt/ifc-bonsai-mcp
-# Normal install (not editable)
-RUN pip3 install .  
-
-# Install libraries needed by MCP + Blender scripts
+# Install libraries needed by Blender scripts
 RUN /opt/blender/4.4/python/bin/python3.11 -m pip install websockets trimesh numpy
 
-# Prepare runtime folder for final image
+# Prepare runtime folder - only copy essential files
 RUN mkdir -p /opt/app_runtime
 RUN cp -r /opt/blender /opt/app_runtime/blender
 RUN cp -r /opt/blender_addons /opt/app_runtime/blender_addons
+
+# Clean up builder cache to reduce image size
+RUN rm -rf /root/.cache /root/.pip /tmp/* /var/tmp/*
 
 # -----------------------------
 # Stage 2: Runtime — minimal / final image
@@ -59,9 +56,8 @@ RUN apt-get update && apt-get install -y \
     libgomp1 libgeos-dev xvfb libxkbcommon0 python3.11 python3.11-venv python3.11-distutils python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy built Blender + MCP + addons from builder
+# Copy built Blender + addons from builder
 COPY --from=builder /opt/app_runtime /opt/app_runtime
-COPY --from=builder /opt/ifc-bonsai-mcp /opt/app_runtime/ifc-bonsai-mcp
 
 # Setup Blender config directory with addons
 RUN mkdir -p /root/.config/blender/4.4/scripts && \
@@ -86,12 +82,13 @@ COPY main.py mcp_client.py blender_generator.py start.sh ./
 # Verify files were copied
 RUN ls -la /app/ && echo "✓ Application files copied successfully"
 
-# Install the MCP package copied from the builder stage using python3.11
-# This ensures the package is installed into the interpreter that will run at runtime
-RUN python3.11 -m pip install --no-cache-dir /opt/app_runtime/ifc-bonsai-mcp
+# Install application dependencies
 RUN python3.11 -m pip install --no-cache-dir websockets httpx
 
 RUN python3 -m pip install --no-cache-dir -r requirements.txt
+
+# Clean up pip cache
+RUN python3 -m pip cache purge
 
 RUN chmod +x start.sh
 
