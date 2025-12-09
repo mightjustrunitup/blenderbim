@@ -123,61 +123,65 @@ async def get_tools_for_llm():
 
 @app.post("/mcp/execute")
 async def execute_mcp_tools(request: MCPGenerateRequest, background_tasks: BackgroundTasks):
-    """Execute MCP tool calls and generate IFC file"""
+    """
+    Execute tool calls that were defined via MCP Bonsai.
     
-    temp_dir = Path(tempfile.mkdtemp())
-    ifc_path = temp_dir / f"{request.project_name.replace(' ', '_')}.ifc"
+    Flow:
+    1. LLM agent retrieves tool definitions from MCP Bonsai (/mcp/tools)
+    2. LLM agent generates tool calls based on user request
+    3. LLM agent sends tool calls to this endpoint
+    4. BlenderBIM backend executes tools in Blender
+    """
     
     try:
-        logger.info(f"[MCP Worker] Starting IFC generation via MCP: {request.project_name}")
-        logger.info(f"[MCP Worker] Tool calls: {len(request.tool_calls)}")
+        logger.info(f"[MCP Worker] Starting tool execution: {request.project_name}")
+        logger.info(f"[MCP Worker] Tool calls to execute: {len(request.tool_calls)}")
         
         # Execute all tool calls
-        for i, tool_call in enumerate(request.tool_calls):
-            logger.info(f"[MCP Worker] Executing tool {i+1}/{len(request.tool_calls)}: {tool_call.tool}")
+        results = []
+        for i, tool_call in enumerate(request.tool_calls, 1):
+            logger.info(f"[MCP Worker] Executing tool {i}/{len(request.tool_calls)}: {tool_call.tool}")
+            logger.info(f"[MCP Worker] Parameters: {tool_call.params}")
             
             try:
                 result = call_mcp_tool(tool_call.tool, tool_call.params)
-                logger.info(f"[MCP Worker] Tool result: {result}")
-            except RuntimeError as e:
-                # RuntimeError from retry-exhausted MCP calls
-                error_msg = f"MCP tool execution failed after retries: {tool_call.tool}\nError: {str(e)}"
-                logger.error(f"[MCP Worker] {error_msg}")
-                return Response(
-                    content=error_msg,
-                    status_code=503,  # Service Unavailable
-                    media_type="text/plain"
-                )
+                logger.info(f"[MCP Worker] Tool {tool_call.tool} result: {result}")
+                results.append({
+                    "tool": tool_call.tool,
+                    "success": True,
+                    "result": result
+                })
             except Exception as e:
-                error_msg = f"MCP tool execution failed: {tool_call.tool}\nError: {str(e)}"
-                logger.error(f"[MCP Worker] {error_msg}")
-                return Response(
-                    content=error_msg,
-                    status_code=500,
-                    media_type="text/plain"
-                )
+                logger.error(f"[MCP Worker] Tool {tool_call.tool} failed: {e}")
+                results.append({
+                    "tool": tool_call.tool,
+                    "success": False,
+                    "error": str(e)
+                })
         
-        # Export the IFC file
-        logger.info(f"[MCP Worker] Exporting IFC to: {ifc_path}")
-        try:
-            export_result = export_ifc(str(ifc_path))
-            logger.info(f"[MCP Worker] Export result: {export_result}")
-        except Exception as e:
-            logger.error(f"[MCP Worker] Export failed: {e}")
-            return Response(
-                content=f"IFC export failed: {str(e)}",
-                status_code=500,
-                media_type="text/plain"
-            )
+        # Return success with all tool execution results
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": f"Executed {len(request.tool_calls)} tools",
+                "project_name": request.project_name,
+                "tools_executed": len(request.tool_calls),
+                "results": results
+            }
+        )
         
-        if not ifc_path.exists():
-            return Response(
-                content="IFC file not created after MCP execution",
-                status_code=500,
-                media_type="text/plain"
-            )
-        
-        file_size = ifc_path.stat().st_size
+    except Exception as e:
+        logger.error(f"[MCP Worker] Unexpected error: {e}")
+        import traceback
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+        )
         
         background_tasks.add_task(cleanup_temp_dir, temp_dir)
         
@@ -371,6 +375,8 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port, workers=1)
+
+
 
 
 
