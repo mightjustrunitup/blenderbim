@@ -74,12 +74,13 @@ RUN ln -s /opt/app_runtime/blender/blender /usr/local/bin/blender
 # Copy and install your application
 COPY requirements.txt ./
 
-# Make sure Python 3.11 has pip & modern packaging tools, then install
-RUN python3.11 -m ensurepip || true
+# Make sure Python 3.11 has pip & modern packaging tools
+RUN apt-get update && apt-get install -y python3.11-distutils python3.11-venv && rm -rf /var/lib/apt/lists/*
+RUN python3.11 -m ensurepip --upgrade
 RUN python3.11 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Make python3 point to python3.11 so scripts using `python3` use the same interpreter
-RUN if [ -x /usr/bin/python3.11 ]; then update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 || ln -sf /usr/bin/python3.11 /usr/bin/python3; fi
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
 # Copy application files FIRST (before pip install) to ensure they're in the container
 COPY main.py mcp_client.py blender_generator.py start.sh ./
@@ -104,4 +105,5 @@ RUN echo "Verifying application structure:" && \
 
 EXPOSE ${PORT}
 CMD ["./start.sh"]
+
 
