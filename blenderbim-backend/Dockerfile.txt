@@ -95,13 +95,5 @@ RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
 RUN chmod +x start.sh
 
-# Final verification that all files exist
-RUN echo "Verifying application structure:" && \
-    ls -la /app/ && \
-    echo "✓ All application files present" && \
-    python3 -c "import sys; sys.path.insert(0, '/app'); from mcp_client import get_mcp_url; print(f'✓ mcp_client imports successfully: {get_mcp_url()}')"
-
 EXPOSE ${PORT}
 CMD ["./start.sh"]
-
-
