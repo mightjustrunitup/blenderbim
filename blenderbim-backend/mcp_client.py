@@ -7,35 +7,72 @@ MCP Bonsai is used by LLM agents for tool definitions only.
 Architecture:
 - LLM Agent calls MCP Bonsai for tool definitions
 - LLM Agent sends tool calls to BlenderBIM backend
-- BlenderBIM backend executes tools directly in Blender
+- BlenderBIM backend executes tools directly in Blender via MCP Bonsai
 """
 
 import logging
 import json
 import requests
 import os
+import subprocess
 from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
 def execute_blender_tool(tool_name: str, params: dict) -> dict:
     """
-    Execute a tool directly in Blender via the addon.
-    This is called by the LLM agent AFTER it has defined the tool via MCP Bonsai.
+    Execute a tool in Blender by calling MCP Bonsai's execution endpoint.
+    MCP Bonsai has a running Blender instance and can execute tools.
     """
     try:
         logger.info(f"[Blender Executor] Executing tool: {tool_name}")
         logger.info(f"[Blender Executor] Parameters: {params}")
         
-        # In a real scenario, this would execute the tool in Blender
-        # For now, return success to avoid errors
+        mcp_url = os.environ.get("MCP_SERVER_URL", "http://localhost:7777")
+        
+        # Call MCP Bonsai to execute the tool
+        # MCP Bonsai will execute it in the running Blender instance
+        response = requests.post(
+            f"{mcp_url}/tools/execute",
+            json={
+                "name": tool_name,
+                "arguments": params
+            },
+            timeout=120
+        )
+        
+        if response.status_code != 200:
+            error_text = response.text
+            logger.error(f"[Blender Executor] MCP execution failed: {response.status_code} - {error_text}")
+            return {
+                "success": False,
+                "tool": tool_name,
+                "error": f"MCP execution failed: {response.status_code}"
+            }
+        
+        result = response.json()
+        logger.info(f"[Blender Executor] Tool {tool_name} executed successfully")
         return {
             "success": True,
             "tool": tool_name,
             "params": params,
-            "message": f"Tool {tool_name} executed in Blender"
+            "result": result
         }
         
+    except requests.exceptions.Timeout:
+        logger.error(f"[Blender Executor] Timeout executing {tool_name}")
+        return {
+            "success": False,
+            "tool": tool_name,
+            "error": "Execution timeout - Blender may be busy"
+        }
+    except requests.exceptions.ConnectionError:
+        logger.error(f"[Blender Executor] Cannot connect to MCP server at {mcp_url}")
+        return {
+            "success": False,
+            "tool": tool_name,
+            "error": f"Cannot connect to MCP server - is it running at {mcp_url}?"
+        }
     except Exception as e:
         logger.error(f"[Blender Executor] Error executing {tool_name}: {e}")
         return {
@@ -78,8 +115,58 @@ def execute_tool_calls(tool_calls: list) -> dict:
     return {"results": results}
 
 def export_ifc(output_path: str) -> dict:
-    """Export the IFC model to a file in Blender"""
-    return call_mcp_tool("export_ifc", {"path": output_path})
+    """
+    Export the IFC model to a file by calling MCP Bonsai.
+    MCP Bonsai will execute the export in the running Blender instance.
+    """
+    try:
+        logger.info(f"[IFC Exporter] Exporting IFC to: {output_path}")
+        
+        mcp_url = os.environ.get("MCP_SERVER_URL", "http://localhost:7777")
+        
+        # Call MCP Bonsai to execute the export_ifc tool
+        response = requests.post(
+            f"{mcp_url}/tools/execute",
+            json={
+                "name": "export_ifc",
+                "arguments": {"path": output_path}
+            },
+            timeout=120
+        )
+        
+        if response.status_code != 200:
+            error_text = response.text
+            logger.error(f"[IFC Exporter] Export failed: {response.status_code} - {error_text}")
+            return {
+                "success": False,
+                "error": f"Export failed: {response.status_code}"
+            }
+        
+        result = response.json()
+        logger.info(f"[IFC Exporter] IFC exported successfully to {output_path}")
+        return {
+            "success": True,
+            "result": result
+        }
+        
+    except requests.exceptions.Timeout:
+        logger.error(f"[IFC Exporter] Timeout during export")
+        return {
+            "success": False,
+            "error": "Export timeout - Blender may be busy"
+        }
+    except requests.exceptions.ConnectionError:
+        logger.error(f"[IFC Exporter] Cannot connect to MCP server")
+        return {
+            "success": False,
+            "error": f"Cannot connect to MCP server at {mcp_url}"
+        }
+    except Exception as e:
+        logger.error(f"[IFC Exporter] Error during export: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 def get_mcp_tools() -> dict:
     """
