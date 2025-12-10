@@ -239,10 +239,6 @@ async def execute_mcp_tools(request: MCPGenerateRequest, background_tasks: Backg
                 "traceback": traceback.format_exc()
             }
         )
-            content=error_msg,
-            status_code=500,
-            media_type="text/plain"
-        )
 
 @app.get("/dump-signatures")
 def get_signatures():
